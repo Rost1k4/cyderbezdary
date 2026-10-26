@@ -1,0 +1,16 @@
+# Секрети: НІКОЛИ не комітити
+.streamlit/secrets.toml
+config_local.py
+.env
+
+# Локальна база турніру
+tournament.db
+*.db
+
+# Службове
+.venv/
+venv/
+__pycache__/
+*.pyc
+reports/
+.DS_Store
