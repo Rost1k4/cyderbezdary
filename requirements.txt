@@ -1,4 +1,4 @@
+streamlit
 requests
 pandas
-streamlit>=1.37
 psycopg2-binary
