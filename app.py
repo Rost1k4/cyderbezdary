@@ -27,7 +27,7 @@ REFRESH_SECONDS = 10
 
 # ---- Налаштуй під себе ----
 EVENT_NAME = "Турнір з Dota 2"
-EVENT_DATE = "Дата уточнюється"
+EVENT_DATE = "Дата уточнюєтьс"
 EVENT_PLACE = "ФТІ КПІ ім. Ігоря Сікорського"
 STREAM_URL = ""  # встав посилання на стрім, напр. "https://www.twitch.tv/..."
 JAR_URL = "https://send.monobank.ua/jar/usfzttkbh"
