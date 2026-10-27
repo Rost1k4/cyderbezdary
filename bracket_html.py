@@ -99,6 +99,49 @@ def match_stats_html(match, heroes, parsed=True):
     return "".join(parts)
 
 
+def _num(p, key):
+    v = p.get(key)
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return None
+    return int(v)
+
+
+def _fmt(v):
+    """12345 -> '12 345' (нерозривний пробіл), відсутнє значення -> 'н/д'."""
+    return "н/д" if v is None else "{:,}".format(v).replace(",", "\u00a0")
+
+
+def players_table_html(players, heroes, title):
+    """Статична таблиця гравців команди у стилі сайту (без меню й статистики колонок)."""
+    cols = [("Гравець", None), ("Герой", None), ("K/D/A", None), ("LH/DN", None),
+            ("GPM", "gold_per_min"), ("XPM", "xp_per_min"),
+            ("Шкода героям", "hero_damage"), ("Шкода вежам", "tower_damage")]
+    best = {}
+    for _, key in cols:
+        if key:
+            vals = [_num(p, key) for p in players]
+            vals = [v for v in vals if v is not None]
+            best[key] = max(vals) if vals else None
+    head = "".join('<th class="%s">%s</th>' % ("" if i < 2 else "n", html.escape(name))
+                   for i, (name, _) in enumerate(cols))
+    rows = []
+    for p in players:
+        name = html.escape(p.get("personaname") or p.get("name") or "Анонім")
+        hero = html.escape(heroes.get(p.get("hero_id"), "Hero #%s" % p.get("hero_id")))
+        kda = "/".join(_fmt(_num(p, k)) for k in ("kills", "deaths", "assists"))
+        lhdn = "/".join(_fmt(_num(p, k)) for k in ("last_hits", "denies"))
+        cells = ['<td>%s</td>' % name, '<td>%s</td>' % hero,
+                 '<td class="n">%s</td>' % kda, '<td class="n">%s</td>' % lhdn]
+        for _, key in cols[4:]:
+            v = _num(p, key)
+            top = " top" if v is not None and v == best[key] else ""
+            cells.append('<td class="n%s">%s</td>' % (top, _fmt(v)))
+        rows.append("<tr>%s</tr>" % "".join(cells))
+    return ('<div class="pt-wrap"><div class="pt-title">%s</div><table class="pt">'
+            '<thead><tr>%s</tr></thead><tbody>%s</tbody></table></div>'
+            % (html.escape(title), head, "".join(rows)))
+
+
 # ------------------------------------------------------------- сітка
 def match_card(slot, stats=None):
     result = slot["result"]
