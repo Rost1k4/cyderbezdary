@@ -15,6 +15,7 @@ import pandas as pd
 import streamlit as st
 
 import ai_review
+import config
 import home_html
 import opendota
 import screenshot_ai
@@ -39,7 +40,7 @@ PAGE_CSS = """<style>
 [data-testid='stMainMenu'],[data-testid='stDeployButton'],.stAppDeployButton,[data-testid='stToolbarActions'],#MainMenu,footer{visibility:hidden;}
 [data-testid='stDecoration']{display:none;}
 [data-testid='stExpandSidebarButton'],[data-testid='stSidebarCollapseButton'],[data-testid='collapsedControl']{visibility:visible !important;}
-.stApp{background-color:#120F2E;background-image:radial-gradient(640px 420px at 92% -6%,rgba(139,108,255,.30),transparent 70%),radial-gradient(520px 380px at -4% 102%,rgba(79,140,255,.18),transparent 70%),radial-gradient(380px 280px at 60% 55%,rgba(196,92,255,.08),transparent 70%),linear-gradient(rgba(58,49,128,.16) 1px,transparent 1px),linear-gradient(90deg,rgba(58,49,128,.16) 1px,transparent 1px);background-size:auto,auto,auto,56px 56px,56px 56px;background-attachment:fixed}
+.stApp{background-color:#120F2E;background-image:radial-gradient(640px 420px at 92% -6%,rgba(139,108,255,.30),transparent 70%),radial-gradient(520px 380px at -4% 102%,rgba(79,140,255,.18),transpar[...]
 .stApp,.stApp p,.stApp label,.stApp button,.stApp input,.stApp textarea{font-family:"Onest",system-ui,-apple-system,"Segoe UI",sans-serif}
 h1,h2,h3{font-family:"Unbounded","Arial Black",system-ui,sans-serif !important;letter-spacing:-.01em}
 .block-container{padding-top:2.2rem;max-width:1280px}
@@ -54,13 +55,12 @@ h1,h2,h3{font-family:"Unbounded","Arial Black",system-ui,sans-serif !important;l
 [data-testid="stPageLink-NavLink"]{border-radius:10px;border:1px solid transparent;transition:background .2s,border-color .2s}
 [data-testid="stPageLink-NavLink"]:hover{background:rgba(139,108,255,.14);border-color:#3A3180}
 [data-testid="stPageLink-NavLink"][aria-current="page"]{background:linear-gradient(90deg,rgba(139,108,255,.32),rgba(139,108,255,.06));border-color:#3A3180}
-.stream-btn{display:block;text-align:center;background:linear-gradient(135deg,#8B6CFF,#C45CFF);color:#fff !important;padding:11px 12px;border-radius:12px;font-weight:700;text-decoration:none !important;margin:12px 0;box-shadow:0 8px 22px rgba(139,108,255,.35);transition:transform .2s,box-shadow .2s}
+.stream-btn{display:block;text-align:center;background:linear-gradient(135deg,#8B6CFF,#C45CFF);color:#fff !important;padding:11px 12px;border-radius:12px;font-weight:700;text-decoration:none !impo[...]
 .stream-btn:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(139,108,255,.5)}
 .stream-btn.off{background:#241E5A;color:#9A93D1 !important;border:1px solid #3A3180;box-shadow:none}
 [data-testid="stBaseButton-secondary"],[data-testid="stBaseButton-secondaryFormSubmit"]{border-radius:10px;border:1px solid #3A3180;background:#1C1745;transition:transform .15s,border-color .15s}
 [data-testid="stBaseButton-secondary"]:hover,[data-testid="stBaseButton-secondaryFormSubmit"]:hover{border-color:#8B6CFF;transform:translateY(-1px)}
-[data-testid="stBaseButton-primary"],[data-testid="stBaseButton-primaryFormSubmit"]{border:0;border-radius:10px;background:linear-gradient(135deg,#8B6CFF,#6F4FE8);box-shadow:0 6px 18px rgba(139,108,255,.35);transition:transform .15s,box-shadow .15s}
-[data-testid="stBaseButton-primary"]:hover,[data-testid="stBaseButton-primaryFormSubmit"]:hover{transform:translateY(-1px);box-shadow:0 10px 26px rgba(139,108,255,.5)}
+[data-testid="stBaseButton-primary"],[data-testid="stBaseButton-primaryFormSubmit"]{border:0;border-radius:10px;background:linear-gradient(135deg,#8B6CFF,#6F4FE8);box-shadow:0 6px 18px rgba(139,10[...]
 [data-baseweb="input"],[data-baseweb="select"]>div,[data-baseweb="textarea"]{border-radius:10px !important}
 button[role="tab"]{font-weight:600}
 button[role="tab"][aria-selected="true"]{color:#8B6CFF}
@@ -386,7 +386,8 @@ def screenshot_admin():
     saved = storage.get_match_stats().get(mk, {}).get(game)
     base = "%s_%d" % (mk, game)
 
-    key_g, model_g = secret("gemini_api_key", "GEMINI_API_KEY"), secret("gemini_model", "GEMINI_MODEL")
+    key_g = secret("gemini_api_key", "GEMINI_API_KEY") or config.api_key()
+    model_g = secret("gemini_model", "GEMINI_MODEL") or config.model()
     host_o, model_o = secret("ollama_host", "OLLAMA_HOST"), secret("ollama_vision_model", "OLLAMA_VISION_MODEL")
     if not screenshot_ai.configured(key_g, model_o):
         st.info("AI для скріншотів не налаштований (додайте gemini_api_key у Secrets), "
@@ -616,7 +617,7 @@ with st.sidebar:
                     st.rerun()
             bo_choice = st.selectbox("Формат матчів", T.VALID_BO, format_func=lambda x: "BO%d" % x)
             if st.button("Запустити турнір", type="primary",
-                         disabled=len(teams) not in T.VALID_SIZES):
+                        disabled=len(teams) not in T.VALID_SIZES):
                 err = storage.start_tournament(bo_choice)
                 flash(err or "Турнір запущено.", "error" if err else "success")
                 st.rerun()

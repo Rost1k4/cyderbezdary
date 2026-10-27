@@ -10,6 +10,8 @@ import re
 
 import requests
 
+import config
+
 TIMEOUT = 120
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"  # змінюється в Secrets: gemini_model
@@ -29,17 +31,17 @@ PROMPT = """You read Dota 2 end-of-match screenshots (scoreboard / results scree
 The images may show different tabs of the SAME match: merge them into ONE record per player
 (match rows by hero and nickname). Return ONLY valid JSON, no comments, exactly in this shape:
 {
- "radiant_win": true | false | null,
- "duration": "MM:SS" | null,
- "radiant_score": integer | null,
- "dire_score": integer | null,
- "players": [
-  {"team": "radiant" | "dire", "name": string | null, "hero_name": string | null,
-   "kills": integer | null, "deaths": integer | null, "assists": integer | null,
-   "last_hits": integer | null, "denies": integer | null,
-   "gold_per_min": integer | null, "xp_per_min": integer | null,
-   "hero_damage": integer | null, "tower_damage": integer | null}
- ]
+  "radiant_win": true | false | null,
+  "duration": "MM:SS" | null,
+  "radiant_score": integer | null,
+  "dire_score": integer | null,
+  "players": [
+   {"team": "radiant" | "dire", "name": string | null, "hero_name": string | null,
+    "kills": integer | null, "deaths": integer | null, "assists": integer | null,
+    "last_hits": integer | null, "denies": integer | null,
+    "gold_per_min": integer | null, "xp_per_min": integer | null,
+    "hero_damage": integer | null, "tower_damage": integer | null}
+  ]
 }
 Rules:
 - Radiant is the top group of 5 players (green side), Dire is the bottom group (red side).
@@ -193,7 +195,7 @@ def _ollama(images, host, model):
 
 
 def configured(gemini_key=None, ollama_model=None):
-    return bool(gemini_key or ollama_model)
+    return bool((gemini_key or config.api_key()) or ollama_model)
 
 
 def extract(images, gemini_key=None, gemini_model=None, ollama_host=None, ollama_model=None):
@@ -207,10 +209,15 @@ def extract(images, gemini_key=None, gemini_model=None, ollama_host=None, ollama
             raise VisionError("Підтримуються лише PNG, JPG та WEBP.")
         if len(data) > MAX_BYTES:
             raise VisionError("Файл завеликий (максимум 8 МБ).")
+
+    gemini_key = gemini_key or config.api_key()
+    gemini_model = gemini_model or config.model() or DEFAULT_GEMINI_MODEL
+
     if gemini_key:
-        raw = _gemini(images, gemini_key, gemini_model or DEFAULT_GEMINI_MODEL)
+        raw = _gemini(images, gemini_key, gemini_model)
     elif ollama_model:
         raw = _ollama(images, ollama_host or "http://localhost:11434", ollama_model)
     else:
-        raise VisionError("AI для скріншотів не налаштований: додайте gemini_api_key у Secrets.")
+        raise VisionError("AI для скріншотів не налаштований: додайте GEMINI_API_KEY або gemini_api_key у Secrets.")
     return parse(raw)
+
