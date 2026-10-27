@@ -388,7 +388,7 @@ def screenshot_admin():
 
     key_g, model_g = secret("gemini_api_key", "GEMINI_API_KEY"), secret("gemini_model", "GEMINI_MODEL")
     openrouter_key = secret("openrouter_api_key", "OPENROUTER_API_KEY")
-    openrouter_model = secret("openrouter_model", "OPENROUTER_MODEL") or "qwen/qwen-vl-plus:free"
+    openrouter_model = secret("openrouter_model", "OPENROUTER_MODEL") or "google/gemini-2.5-flash"
     host_o, model_o = secret("ollama_host", "OLLAMA_HOST"), secret("ollama_vision_model", "OLLAMA_VISION_MODEL")
     if not screenshot_ai.configured(key_g, model_o, openrouter_key):
         st.info("AI для скріншотів не налаштований (додайте gemini_api_key або openrouter_api_key у Secrets), "
