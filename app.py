@@ -2,12 +2,16 @@
 
 Запускається через main.py (кнопка Run), окремо нічого вводити не треба.
 Сторінки: 1) Привітання  2) Турнірна таблиця  3) Ігри та аналіз.
+Є ще прихована сторінка входу організатора: /admin (її немає в меню).
 Вносити результати та керувати командами може лише організатор за паролем.
 """
-import hmac
-import os
-from pathlib import Path
 import base64
+import hmac
+import html
+import os
+import time
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
@@ -16,40 +20,20 @@ import ai_review
 import opendota
 import storage
 import tournament as T
-from bracket_html import bracket_html
+from bracket_html import bracket_html, match_stats_html
 from matchview import format_duration, is_radiant, player_name, val
 
 REFRESH_SECONDS = 10
 
-# Налаштуй під себе
+# ---- Налаштуй під себе ----
 EVENT_NAME = "Турнір з Dota 2"
-EVENT_DATE = "Дата уточнюєтьс"
+EVENT_DATE = "Дата уточнюється"
 EVENT_PLACE = "ФТІ КПІ ім. Ігоря Сікорського"
+STREAM_URL = ""  # встав посилання на стрім, напр. "https://www.twitch.tv/..."
+JAR_URL = "https://send.monobank.ua/jar/usfzttkbh"
 
 st.set_page_config(page_title="Dota 2 · ФТІ КПІ", page_icon="🏆", layout="wide")
-
-
-def load_secrets():
-    """Підхоплює ключі з Secrets (Streamlit Cloud) або .streamlit/secrets.toml (локально)."""
-    for secret, env in (("gemini_api_key", "GEMINI_API_KEY"), ("gemini_model", "GEMINI_MODEL"),
-                        ("database_url", "DATABASE_URL")):
-        if os.environ.get(env):
-            continue
-        try:
-            value = st.secrets.get(secret)
-        except Exception:
-            value = None
-        if value:
-            os.environ[env] = str(value).strip()
-
-
-load_secrets()
-try:
-    storage.init_db()
-except Exception as e:  # пароль до БД у повідомлення не потрапляє: показуємо лише тип помилки
-    st.error("Не вдалося підключитися до бази даних (%s). "
-             "Перевірте значення database_url у Secrets." % type(e).__name__)
-    st.stop()
+storage.init_db()
 
 PAGE_CSS = """<style>
 [data-testid='stMainMenu'],[data-testid='stDeployButton'],.stAppDeployButton,[data-testid='stToolbarActions'],#MainMenu,footer{visibility:hidden;}
@@ -63,6 +47,11 @@ PAGE_CSS = """<style>
 .card{background:#1C1745;border:1px solid #3A3180;border-radius:12px;overflow:hidden;height:100%}
 .card .ch{background:#241E5A;padding:8px 16px;font-weight:600;color:#ECE9FF}
 .card .cb{padding:14px 16px;color:#9A93D1}
+.stream-btn{display:block;text-align:center;background:#8B6CFF;color:#fff !important;
+            padding:10px 12px;border-radius:10px;font-weight:700;text-decoration:none !important;
+            margin:10px 0}
+.stream-btn:hover{filter:brightness(1.12)}
+.stream-btn.off{background:#241E5A;color:#9A93D1 !important;border:1px solid #3A3180}
 [data-testid="stExpander"]{background:#1C1745;border:1px solid #3A3180;border-radius:10px}
 [data-testid="stSidebar"]{border-right:1px solid #3A3180}
 </style>"""
@@ -114,7 +103,43 @@ def cached_heroes():
 @st.cache_data(ttl=3600, show_spinner=False)
 def cached_ai_short(match_id):
     """Одна AI-оцінка на матч для всіх глядачів (економить запити). Помилки не кешуються."""
-    return ai_review.short_review(opendota.get_match(match_id), cached_heroes())
+    return ai_review.short_review(opendota.get_match(match_id), _cached_heroes())
+
+
+# ---- статистика для розкритих карток у сітці (кеш в пам'яті сервера) ----
+@st.cache_resource
+def _stats_store():
+    return {}
+
+
+def _fetch_stats(mid, heroes, store):
+    """Готує html статистики і кладе в кеш. Успіх кешується надовго, помилка ненадовго.
+
+    Працює у фоновому потоці, тому жодних викликів st.* тут немає.
+    """
+    try:
+        match = opendota.get_match(int(mid))
+        parsed = opendota.is_parsed(match)
+        text = match_stats_html(match, heroes, parsed=parsed)
+        ttl = 3600 if parsed else 300
+    except opendota.OpenDotaError as e:
+        text = '<div class="note">%s</div>' % html.escape(str(e))
+        ttl = 120
+    except Exception:
+        text = '<div class="note">Не вдалося завантажити статистику.</div>'
+        ttl = 60
+    store[mid] = (time.time() + ttl, text)
+
+
+def load_stats(mids, heroes):
+    """{match_id: html} для всіх потрібних матчів; нові запити йдуть паралельно."""
+    store = _stats_store()
+    now = time.time()
+    todo = [m for m in mids if not (m in store and now < store[m][0])]
+    if todo:
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            list(pool.map(lambda m: _fetch_stats(m, heroes, store), todo))
+    return {m: store[m][1] for m in mids if m in store}
 
 
 def players_df(players, heroes):
@@ -160,7 +185,7 @@ def render_match_analysis(mid, scope):
     ai_key = "ai_text_%d" % mid
     if st.button("🤖 Коротко від AI", key="ai_%s_%d" % (scope, mid)):
         try:
-            with st.spinner("AI аналізує матч..."):
+            with st.spinner("AI аналізує матч (локальна модель, може зайняти до хвилини)..."):
                 st.session_state[ai_key] = cached_ai_short(mid)
         except (ai_review.AIError, opendota.OpenDotaError) as e:
             st.session_state.pop(ai_key, None)
@@ -187,9 +212,13 @@ def bracket_view():
     champ = T.champion(slots)
     if champ:
         st.success("🏆 Чемпіон турніру: **%s**" % champ)
-    st.caption("Формат матчів: BO%d. Бурштинова рамка: матч готовий до гри. М'ятна: завершено. "
+    st.caption("Формат матчів: BO%d. Бурштинова рамка: матч готовий до гри. М'ятна: завершено, "
+               "натисніть на завершений матч, щоб побачити статистику. "
                "Сторінка оновлюється кожні %d с." % (bo, REFRESH_SECONDS))
-    st.markdown(bracket_html(len(teams), slots), unsafe_allow_html=True)
+    mids = {s["result"]["dota_match_id"] for s in slots.values()
+            if s["result"] and s["result"]["dota_match_id"]}
+    stats = load_stats(mids, cached_heroes()) if mids else {}
+    st.markdown(bracket_html(len(teams), slots, stats), unsafe_allow_html=True)
 
 
 @st.fragment(run_every=REFRESH_SECONDS)
@@ -204,18 +233,7 @@ def table_view():
          "Мапи": "%d:%d" % (v["MW"], v["ML"])}
         for t, v in rec.items()
     ]).sort_values(["Перемоги", "Поразки"], ascending=[False, True])
-    st.subheader("Лічильник перемог")
     st.dataframe(table, hide_index=True)
-    st.subheader("Журнал матчів")
-    log = [{"Матч": k, "Команда A": s["a"],
-            "Рахунок": "%d:%d" % (s["result"]["score_a"], s["result"]["score_b"]),
-            "Команда B": s["b"], "Переможець": s["result"]["winner"],
-            "Dota Match ID": s["result"]["dota_match_id"] or ""}
-           for k, s in slots.items() if s["result"]]
-    if log:
-        st.dataframe(pd.DataFrame(log), hide_index=True)
-    else:
-        st.info("Результатів ще немає.")
 
 
 # ------------------------------------------------------ блок організатора
@@ -350,44 +368,68 @@ def games_page():
         render_match_analysis(mid, "free")
 
 
+def admin_page():
+    """Прихована сторінка входу: адреса /admin, у меню її немає."""
+    st.title("🔐 Вхід організатора")
+    if st.session_state.get("is_admin", False):
+        st.success("Ви вже в режимі організатора.")
+        if st.button("Вийти з режиму організатора"):
+            st.session_state["is_admin"] = False
+            st.rerun()
+        st.page_link(PAGE_WELCOME, label="На головну", icon="🏠")
+        return
+    password = admin_password()
+    if not password:
+        st.warning("Пароль організатора не задано. Додайте admin_password у Secrets "
+                   "(або змінну TOURNAMENT_ADMIN_PASSWORD).")
+        return
+    with st.form("login"):
+        entered = st.text_input("Пароль", type="password")
+        submitted = st.form_submit_button("Увійти", type="primary")
+    if submitted:
+        if hmac.compare_digest(entered.encode("utf-8"), password.encode("utf-8")):
+            st.session_state["is_admin"] = True
+            st.switch_page(PAGE_WELCOME)  # після входу повертаємо на головну
+        else:
+            time.sleep(1)  # уповільнює підбір пароля
+            st.error("Неправильний пароль.")
+
+
 # ---------------------------------------------------------------- навігація
 PAGE_WELCOME = st.Page(welcome_page, title="Привітання", icon="🏠", url_path="welcome", default=True)
 PAGE_TABLE = st.Page(table_page, title="Турнірна таблиця", icon="🏆", url_path="bracket")
 PAGE_GAMES = st.Page(games_page, title="Ігри та аналіз", icon="📊", url_path="games")
-pg = st.navigation([PAGE_WELCOME, PAGE_TABLE, PAGE_GAMES])
+PAGE_ADMIN = st.Page(admin_page, title="Вхід організатора", icon="🔐", url_path="admin")
+# position="hidden": стандартне меню не показується, свої посилання нижче (без /admin)
+pg = st.navigation([PAGE_WELCOME, PAGE_TABLE, PAGE_GAMES, PAGE_ADMIN], position="hidden")
 
 # ---------------------------------------------------------------- бічна панель
 is_admin = st.session_state.get("is_admin", False)
 
 with st.sidebar:
-    if not is_admin:
-        st.header("Організатор")
-        password = admin_password()
-        if not password:
-            st.info("Пароль організатора не задано, тому доступний лише перегляд. "
-                    "Задайте admin_password у Secrets (Streamlit Cloud) або в .streamlit/secrets.toml.")
-        else:
-            with st.form("login"):
-                entered = st.text_input("Пароль", type="password")
-                if st.form_submit_button("Увійти"):
-                    if hmac.compare_digest(entered.encode("utf-8"), password.encode("utf-8")):
-                        st.session_state["is_admin"] = True
-                        st.rerun()
-                    else:
-                        st.error("Неправильний пароль.")
+    st.page_link(PAGE_WELCOME, label="Привітання", icon="🏠")
+    st.page_link(PAGE_TABLE, label="Турнірна таблиця", icon="🏆")
+    st.page_link(PAGE_GAMES, label="Ігри та аналіз", icon="📊")
+
+    if STREAM_URL:
+        st.markdown('<a class="stream-btn" href="%s" target="_blank" '
+                    'rel="noopener noreferrer">📺 Дивитись стрім</a>' % html.escape(STREAM_URL, quote=True),
+                    unsafe_allow_html=True)
     else:
+        st.markdown('<span class="stream-btn off">📺 Стрім скоро буде</span>',
+                    unsafe_allow_html=True)
+
+    if is_admin:
+        st.divider()
         st.header("Керування турніром")
-        if storage.is_persistent():
-            st.caption("💾 Сховище: PostgreSQL. Дані зберігаються постійно.")
-        else:
-            st.info("💾 Дані лежать у локальному файлі tournament.db. На Streamlit Cloud він "
-                    "тимчасовий і може зникнути при перезапуску: додайте database_url у Secrets.")
         if st.button("Вийти з режиму організатора"):
             st.session_state["is_admin"] = False
             st.rerun()
         teams = storage.get_teams()
         if not storage.is_started():
-            st.caption("Додайте 4 або 8 команд. Порядок додавання = номер у сітці.")
+            st.caption("Додайте %s команд. Порядок додавання = номер у сітці. "
+                       "При 12 і 14 командах перші в списку отримують bye "
+                       "(одразу у другий раунд верхньої сітки)." % T.sizes_text())
             with st.form("add_team", clear_on_submit=True):
                 new_name = st.text_input("Назва команди")
                 if st.form_submit_button("Додати команду"):
@@ -407,7 +449,7 @@ with st.sidebar:
                 flash(err or "Турнір запущено.", "error" if err else "success")
                 st.rerun()
             if len(teams) not in T.VALID_SIZES:
-                st.info("Команд: %d. Потрібно 4 або 8." % len(teams))
+                st.info("Команд: %d. Потрібно %s." % (len(teams), T.sizes_text()))
         else:
             st.write("Команд: **%d**, формат: **BO%d**" % (len(teams), storage.get_bo()))
             with st.expander("Скинути турнір"):
@@ -417,11 +459,10 @@ with st.sidebar:
                     storage.reset_all()
                     flash("Турнір скинуто.")
                     st.rerun()
-JAR_URL = "https://send.monobank.ua/jar/usfzttkbh"
-QR_PATH = Path(__file__).with_name("qr.png")
-if QR_PATH.exists():
-    qr_b64 = base64.b64encode(QR_PATH.read_bytes()).decode()
-    with st.sidebar:
+
+    QR_PATH = Path(__file__).with_name("qr.png")
+    if QR_PATH.exists():
+        qr_b64 = base64.b64encode(QR_PATH.read_bytes()).decode()
         st.divider()
         st.markdown(
             '<div style="text-align:center">'
@@ -432,7 +473,7 @@ if QR_PATH.exists():
             '<div style="color:#9A93D1;font-size:.8rem;margin-top:6px">'
             'Натисніть на код, щоб відкрити банку</div></div>' % (JAR_URL, qr_b64),
             unsafe_allow_html=True)
-        st.link_button("💜 Підтримати", JAR_URL, use_container_width=True)
+
 if "flash" in st.session_state:
     kind, message = st.session_state.pop("flash")
     getattr(st, kind)(message)
