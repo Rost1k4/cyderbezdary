@@ -394,7 +394,7 @@ def admin_page():
 PAGE_WELCOME = st.Page(welcome_page, title="Привітання", icon="🏠", url_path="welcome", default=True)
 PAGE_TABLE = st.Page(table_page, title="Турнірна таблиця", icon="🏆", url_path="bracket")
 PAGE_GAMES = st.Page(games_page, title="Ігри та аналіз", icon="📊", url_path="games")
-PAGE_ADMIN = st.Page(admin_page, title="Вхід організатора", icon="🔐", url_path="admin")
+PAGE_ADMIN = st.Page(admin_page, title="Вхід організатора", icon="🔐", url_path="cibybybyznik")
 # position="hidden": стандартне меню не показується, свої посилання нижче (без /admin)
 pg = st.navigation([PAGE_WELCOME, PAGE_TABLE, PAGE_GAMES, PAGE_ADMIN], position="hidden")
 
