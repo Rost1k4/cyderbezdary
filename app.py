@@ -166,20 +166,30 @@ def load_stats(mids, heroes):
     return {m: store[m][1] for m in mids if m in store}
 
 
+PLAYER_NUM_COLS = ["K", "D", "A", "LH", "DN", "GPM", "XPM", "Шкода героям", "Шкода вежам"]
+PLAYER_COLUMN_CONFIG = {c: st.column_config.NumberColumn(c, format="%d") for c in PLAYER_NUM_COLS}
+
+
 def players_df(players, heroes):
+    """Таблиця гравців зі справжніми числами (правильне сортування та статистика колонок)."""
     rows = []
     for p in players:
         rows.append({
             "Гравець": player_name(p),
             "Герой": heroes.get(p.get("hero_id"), "Hero #%s" % p.get("hero_id")),
-            "K/D/A": "%s/%s/%s" % (val(p, "kills"), val(p, "deaths"), val(p, "assists")),
-            "LH/DN": "%s/%s" % (val(p, "last_hits"), val(p, "denies")),
-            "GPM": val(p, "gold_per_min"),
-            "XPM": val(p, "xp_per_min"),
-            "Шкода героям": val(p, "hero_damage"),
-            "Шкода вежам": val(p, "tower_damage"),
+            "K": p.get("kills"), "D": p.get("deaths"), "A": p.get("assists"),
+            "LH": p.get("last_hits"), "DN": p.get("denies"),
+            "GPM": p.get("gold_per_min"), "XPM": p.get("xp_per_min"),
+            "Шкода героям": p.get("hero_damage"), "Шкода вежам": p.get("tower_damage"),
         })
-    return pd.DataFrame(rows)
+    df = pd.DataFrame(rows)
+    for col in PLAYER_NUM_COLS:  # відсутні дані стають порожніми, а не "н/д" чи нулем
+        df[col] = pd.to_numeric(df[col], errors="coerce").astype("Int64")
+    return df
+
+
+def show_players(players, heroes):
+    st.dataframe(players_df(players, heroes), hide_index=True, column_config=PLAYER_COLUMN_CONFIG)
 
 
 def render_match_analysis(mid, scope):
@@ -219,9 +229,9 @@ def render_match_analysis(mid, scope):
 
     players = match["players"]
     st.markdown("**Radiant**")
-    st.dataframe(players_df([p for p in players if is_radiant(p)], heroes), hide_index=True)
+    show_players([p for p in players if is_radiant(p)], heroes)
     st.markdown("**Dire**")
-    st.dataframe(players_df([p for p in players if not is_radiant(p)], heroes), hide_index=True)
+    show_players([p for p in players if not is_radiant(p)], heroes)
 
 
 # --------------------------------------------- публічні блоки (самооновлення)
