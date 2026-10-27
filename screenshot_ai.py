@@ -12,7 +12,7 @@ import requests
 
 import config
 
-TIMEOUT = 120
+TIMEOUT = 350
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"  # змінюється в Secrets: gemini_model
 MAX_IMAGES = 4
@@ -220,4 +220,3 @@ def extract(images, gemini_key=None, gemini_model=None, ollama_host=None, ollama
     else:
         raise VisionError("AI для скріншотів не налаштований: додайте GEMINI_API_KEY або gemini_api_key у Secrets.")
     return parse(raw)
-
