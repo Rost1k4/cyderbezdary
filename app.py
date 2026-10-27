@@ -23,7 +23,7 @@ REFRESH_SECONDS = 10
 
 # Налаштуй під себе
 EVENT_NAME = "Турнір з Dota 2"
-EVENT_DATE = "Дата уточнюється"
+EVENT_DATE = "Дата уточнюєтьс"
 EVENT_PLACE = "ФТІ КПІ ім. Ігоря Сікорського"
 
 st.set_page_config(page_title="Dota 2 · ФТІ КПІ", page_icon="🏆", layout="wide")
