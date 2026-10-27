@@ -15,8 +15,8 @@ CSS = """<style>
 .br-col:has(details.m[open]){min-width:640px}
 .br-col h5{margin:0 0 6px;font-size:.85rem;font-weight:600;color:#9A93D1}
 .br-ms{display:flex;flex-direction:column;justify-content:space-around;gap:14px;flex:1}
-.m{border:1px solid #3A3180;border-radius:8px;overflow:hidden;background:#1C1745;color:#ECE9FF}
-.m.ready{border-color:#FF9F43;box-shadow:0 0 0 1px #FF9F43}
+.m{border:1px solid #3A3180;border-radius:12px;overflow:hidden;background:#1C1745;color:#ECE9FF;transition:transform .2s,box-shadow .2s,border-color .2s}.m:hover{transform:translateY(-2px)}
+.m.ready{border-color:#FF9F43;box-shadow:0 0 0 1px #FF9F43;animation:br-pulse 2.4s ease-in-out infinite}@keyframes br-pulse{50%{box-shadow:0 0 0 1px #FF9F43,0 0 20px rgba(255,159,67,.45)}}
 .m.done{border-color:#35D6A0}
 .m .hd{display:flex;justify-content:space-between;font-size:.72rem;padding:3px 8px;background:#241E5A;color:#9A93D1}
 .m .t{display:flex;justify-content:space-between;gap:10px;padding:6px 8px;font-size:.9rem}
@@ -38,9 +38,9 @@ details.m[open]>summary .hd{background:#8B6CFF;color:#fff}
 .stats th{color:#9A93D1;text-align:left;font-weight:600;padding:2px 6px;border-bottom:1px solid #3A3180}
 .stats td{padding:3px 6px;border-bottom:1px solid rgba(58,49,128,.5)}
 .stats .note{color:#9A93D1;font-size:.78rem;font-style:italic;margin-top:8px}
-@media (prefers-reduced-motion:reduce){.br-col{transition:none}.m .stats{animation:none}}
-.sec{border-left:5px solid;padding-left:10px;margin:22px 0 8px}
-.sec h3{margin:0;padding:0}
+@media (prefers-reduced-motion:reduce){.br-col{transition:none}.m .stats{animation:none}.m.ready{animation:none}.m{transition:none}}
+.sec{border-left:5px solid;padding:8px 16px;margin:26px 0 10px;border-radius:0 12px 12px 0;background:linear-gradient(90deg,rgba(255,255,255,.06),transparent)}
+.sec h3{margin:0;padding:0;font-family:"Unbounded","Arial Black",system-ui,sans-serif;font-size:1.02rem;letter-spacing:.02em}
 .sec.WB{border-color:#4F8CFF}.sec.WB h3{color:#4F8CFF}
 .sec.LB{border-color:#C45CFF}.sec.LB h3{color:#C45CFF}
 .sec.GF{border-color:#FFD166}.sec.GF h3{color:#FFD166}

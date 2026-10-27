@@ -17,7 +17,7 @@ import pandas as pd
 import streamlit as st
 
 import ai_review
-import config
+import home_html
 import opendota
 import storage
 import tournament as T
@@ -34,78 +34,52 @@ STREAM_URL = ""  # встав посилання на стрім, напр. "htt
 JAR_URL = "https://send.monobank.ua/jar/usfzttkbh"
 
 st.set_page_config(page_title="Dota 2 · ФТІ КПІ", page_icon="🏆", layout="wide")
-
-# Під якими назвами шукаємо значення в Secrets (регістр не важливий)
-SECRET_NAMES = {
-    "GEMINI_API_KEY": ("gemini_api_key", "google_api_key"),
-    "GEMINI_MODEL": ("gemini_model",),
-    "DATABASE_URL": ("database_url",),
-}
-
-
-def _clean_secret(value):
-    return str(value).strip().strip("\"'").strip() if value is not None else ""
-
-
-def _find_secret(names):
-    """Шукає значення в Secrets: на верхньому рівні, а потім усередині будь-якої [секції]."""
-    try:
-        flat = {str(k).lower(): v for k, v in st.secrets.items()}
-    except Exception:
-        return ""
-    for name in names:
-        value = _clean_secret(flat.get(name))
-        if value:
-            return value
-    for section in flat.values():  # ключ випадково опинився під [секцією]
-        if hasattr(section, "keys"):
-            inner = {str(k).lower(): v for k, v in section.items()}
-            for name in names:
-                value = _clean_secret(inner.get(name))
-                if value:
-                    return value
-    return ""
-
-
-def load_secrets():
-    """Підхоплює ключі з Secrets (Streamlit Cloud) або .streamlit/secrets.toml (локально)."""
-    for env, names in SECRET_NAMES.items():
-        if os.environ.get(env):
-            continue
-        value = _find_secret(names)
-        if value:
-            os.environ[env] = value
-
-
-load_secrets()
-try:
-    storage.init_db()
-except Exception as e:  # пароль до БД у повідомлення не потрапляє: показуємо лише тип помилки
-    st.error("Не вдалося підключитися до бази даних (%s). "
-             "Перевірте значення database_url у Secrets." % type(e).__name__)
-    st.stop()
+storage.init_db()
 
 PAGE_CSS = """<style>
+@import url('https://fonts.googleapis.com/css2?family=Onest:wght@400;500;700&family=Unbounded:wght@500;700;800&display=swap');
 [data-testid='stMainMenu'],[data-testid='stDeployButton'],.stAppDeployButton,[data-testid='stToolbarActions'],#MainMenu,footer{visibility:hidden;}
 [data-testid='stDecoration']{display:none;}
 [data-testid='stExpandSidebarButton'],[data-testid='stSidebarCollapseButton'],[data-testid='collapsedControl']{visibility:visible !important;}
-.hero{background:linear-gradient(135deg,#241E5A 0%,#1C1745 100%);
-      border:1px solid #3A3180;border-radius:18px;padding:48px 40px;margin-bottom:24px}
-.hero .tag{color:#8B6CFF;font-weight:700;letter-spacing:.12em;font-size:.85rem}
-.hero h1{margin:8px 0 12px;font-size:2.8rem;color:#ECE9FF}
-.hero p{color:#9A93D1;font-size:1.1rem;max-width:720px;margin:0}
-.card{background:#1C1745;border:1px solid #3A3180;border-radius:12px;overflow:hidden;height:100%}
-.card .ch{background:#241E5A;padding:8px 16px;font-weight:600;color:#ECE9FF}
-.card .cb{padding:14px 16px;color:#9A93D1}
-.stream-btn{display:block;text-align:center;background:#8B6CFF;color:#fff !important;
-            padding:10px 12px;border-radius:10px;font-weight:700;text-decoration:none !important;
-            margin:10px 0}
-.stream-btn:hover{filter:brightness(1.12)}
-.stream-btn.off{background:#241E5A;color:#9A93D1 !important;border:1px solid #3A3180}
-[data-testid="stExpander"]{background:#1C1745;border:1px solid #3A3180;border-radius:10px}
-[data-testid="stSidebar"]{border-right:1px solid #3A3180}
+.stApp{background-color:#120F2E;background-image:radial-gradient(640px 420px at 92% -6%,rgba(139,108,255,.30),transparent 70%),radial-gradient(520px 380px at -4% 102%,rgba(79,140,255,.18),transparent 70%),radial-gradient(380px 280px at 60% 55%,rgba(196,92,255,.08),transparent 70%),linear-gradient(rgba(58,49,128,.16) 1px,transparent 1px),linear-gradient(90deg,rgba(58,49,128,.16) 1px,transparent 1px);background-size:auto,auto,auto,56px 56px,56px 56px;background-attachment:fixed}
+.stApp,.stApp p,.stApp label,.stApp button,.stApp input,.stApp textarea{font-family:"Onest",system-ui,-apple-system,"Segoe UI",sans-serif}
+h1,h2,h3{font-family:"Unbounded","Arial Black",system-ui,sans-serif !important;letter-spacing:-.01em}
+.block-container{padding-top:2.2rem;max-width:1280px}
+.ph{margin-bottom:10px;animation:fup .6s ease both}
+.ph .tag{color:#8B6CFF;font-weight:700;letter-spacing:.16em;font-size:.74rem;text-transform:uppercase}
+.ph h1{font-size:clamp(1.7rem,3.6vw,2.4rem);margin:6px 0 4px;padding:0}
+[data-testid="stSidebar"]{background:linear-gradient(180deg,#1C1745,#161236);border-right:1px solid #3A3180}
+.brand{display:flex;align-items:center;gap:12px;padding:4px 2px 16px;margin-bottom:10px;border-bottom:1px solid #3A3180}
+.brand .lg{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-size:1.3rem;background:linear-gradient(135deg,#4F8CFF,#C45CFF);box-shadow:0 6px 18px rgba(139,108,255,.4)}
+.brand b{display:block;font-family:"Unbounded","Arial Black",sans-serif;font-size:.9rem}
+.brand span{color:#9A93D1;font-size:.72rem}
+[data-testid="stPageLink-NavLink"]{border-radius:10px;border:1px solid transparent;transition:background .2s,border-color .2s}
+[data-testid="stPageLink-NavLink"]:hover{background:rgba(139,108,255,.14);border-color:#3A3180}
+[data-testid="stPageLink-NavLink"][aria-current="page"]{background:linear-gradient(90deg,rgba(139,108,255,.32),rgba(139,108,255,.06));border-color:#3A3180}
+.stream-btn{display:block;text-align:center;background:linear-gradient(135deg,#8B6CFF,#C45CFF);color:#fff !important;padding:11px 12px;border-radius:12px;font-weight:700;text-decoration:none !important;margin:12px 0;box-shadow:0 8px 22px rgba(139,108,255,.35);transition:transform .2s,box-shadow .2s}
+.stream-btn:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(139,108,255,.5)}
+.stream-btn.off{background:#241E5A;color:#9A93D1 !important;border:1px solid #3A3180;box-shadow:none}
+.supp{margin-top:8px;padding:14px 10px;text-align:center;border:1px solid #3A3180;border-radius:16px;background:rgba(36,30,90,.55)}
+.supp .st{font-weight:700;margin-bottom:8px;font-size:.9rem}.supp img{width:100%;max-width:200px;cursor:pointer;transition:transform .2s}.supp img:hover{transform:scale(1.04)}
+.supp .hint{color:#9A93D1;font-size:.76rem;margin-top:6px}
+[data-testid="stBaseButton-secondary"],[data-testid="stBaseButton-secondaryFormSubmit"]{border-radius:10px;border:1px solid #3A3180;background:#1C1745;transition:transform .15s,border-color .15s}
+[data-testid="stBaseButton-secondary"]:hover,[data-testid="stBaseButton-secondaryFormSubmit"]:hover{border-color:#8B6CFF;transform:translateY(-1px)}
+[data-testid="stBaseButton-primary"],[data-testid="stBaseButton-primaryFormSubmit"]{border:0;border-radius:10px;background:linear-gradient(135deg,#8B6CFF,#6F4FE8);box-shadow:0 6px 18px rgba(139,108,255,.35);transition:transform .15s,box-shadow .15s}
+[data-testid="stBaseButton-primary"]:hover,[data-testid="stBaseButton-primaryFormSubmit"]:hover{transform:translateY(-1px);box-shadow:0 10px 26px rgba(139,108,255,.5)}
+[data-baseweb="input"],[data-baseweb="select"]>div,[data-baseweb="textarea"]{border-radius:10px !important}
+button[role="tab"]{font-weight:600}
+button[role="tab"][aria-selected="true"]{color:#8B6CFF}
+[data-testid="stDataFrame"]{border:1px solid #3A3180;border-radius:12px;overflow:hidden}
+[data-testid="stAlert"]{border-radius:12px;border:1px solid #3A3180}
+[data-testid="stExpander"]{background:#1C1745;border:1px solid #3A3180;border-radius:12px}
+[data-testid="stMetric"]{background:#1C1745;border:1px solid #3A3180;border-radius:12px;padding:12px 16px}
 </style>"""
-st.markdown(PAGE_CSS.replace("\n", ""), unsafe_allow_html=True)
+st.markdown(PAGE_CSS.replace("\n", "") + home_html.CSS.replace("\n", ""), unsafe_allow_html=True)
+
+
+def page_header(tag, title):
+    st.markdown('<div class="ph"><span class="tag">%s</span><h1>%s</h1></div>' % (tag, title),
+                unsafe_allow_html=True)
 
 
 # ------------------------------------------------------------------ допоміжне
@@ -153,7 +127,7 @@ def cached_heroes():
 @st.cache_data(ttl=3600, show_spinner=False)
 def cached_ai_short(match_id):
     """Одна AI-оцінка на матч для всіх глядачів (економить запити). Помилки не кешуються."""
-    return ai_review.short_review(opendota.get_match(match_id), cached_heroes())
+    return ai_review.short_review(opendota.get_match(match_id), _cached_heroes())
 
 
 # ---- статистика для розкритих карток у сітці (кеш в пам'яті сервера) ----
@@ -208,9 +182,6 @@ def players_df(players, heroes):
     return pd.DataFrame(rows)
 
 
-AI_DISCLAIMER = "AI може помилятися. Перевіряйте важливу інформацію."
-
-
 def render_match_analysis(mid, scope):
     """Статистика матчу + AI. scope робить ключі кнопок унікальними на сторінці."""
     try:
@@ -238,14 +209,13 @@ def render_match_analysis(mid, scope):
     ai_key = "ai_text_%d" % mid
     if st.button("🤖 Коротко від AI", key="ai_%s_%d" % (scope, mid)):
         try:
-            with st.spinner("AI аналізує матч..."):
+            with st.spinner("AI аналізує матч (локальна модель, може зайняти до хвилини)..."):
                 st.session_state[ai_key] = cached_ai_short(mid)
         except (ai_review.AIError, opendota.OpenDotaError) as e:
             st.session_state.pop(ai_key, None)
             st.error(str(e))
     if ai_key in st.session_state:
         st.info(st.session_state[ai_key])
-    st.caption(AI_DISCLAIMER)
 
     players = match["players"]
     st.markdown("**Radiant**")
@@ -346,23 +316,9 @@ def results_admin():
 
 # =============================================================== СТОРІНКИ
 def welcome_page():
-    st.markdown(
-        '<div class="hero"><div class="tag">ФТІ КПІ ІМ. ІГОРЯ СІКОРСЬКОГО</div>'
-        '<h1>%s</h1><p>Вітаємо на турнірі з Dota 2! Слідкуйте за сіткою, результатами '
-        'та детальним аналізом кожної гри в реальному часі.</p></div>' % EVENT_NAME,
-        unsafe_allow_html=True)
-
     teams, started, bo, results, slots = load_state()
-    c1, c2, c3 = st.columns(3)
-    c1.markdown('<div class="card"><div class="ch">📅 Коли</div><div class="cb">%s</div></div>'
-                % EVENT_DATE, unsafe_allow_html=True)
-    c2.markdown('<div class="card"><div class="ch">📍 Де</div><div class="cb">%s</div></div>'
-                % EVENT_PLACE, unsafe_allow_html=True)
-    fmt = ("%d команд, BO%d" % (len(teams), bo)) if started else "Реєстрація команд триває"
-    c3.markdown('<div class="card"><div class="ch">⚔️ Формат</div><div class="cb">'
-                'Double elimination: верхня та нижня сітки, Grand Final.<br>%s</div></div>' % fmt,
+    st.markdown(home_html.welcome_html(teams, started, bo, slots, EVENT_DATE, EVENT_PLACE, STREAM_URL),
                 unsafe_allow_html=True)
-
     st.write("")
     st.info("Учасникам: перед грою ввімкніть у Dota 2 «Журнал матчів доступний усім» "
             "(Налаштування → Спільнота → Параметри), інакше статистика матчу не з'явиться.")
@@ -372,7 +328,7 @@ def welcome_page():
 
 
 def table_page():
-    st.title("🏆 Турнірна таблиця")
+    page_header("Live", "🏆 Турнірна таблиця")
     tab_bracket, tab_table = st.tabs(["Сітка", "Таблиця команд"])
     with tab_bracket:
         bracket_view()
@@ -384,7 +340,7 @@ def table_page():
 
 
 def games_page():
-    st.title("📊 Ігри та аналіз")
+    page_header("Матчі", "📊 Ігри та аналіз")
     teams, started, bo, results, slots = load_state()
     st.subheader("Зіграні матчі")
     if not started:
@@ -424,7 +380,7 @@ def games_page():
 
 def admin_page():
     """Прихована сторінка входу: адреса /admin, у меню її немає."""
-    st.title("🔐 Вхід організатора")
+    page_header("Лише для організаторів", "🔐 Вхід організатора")
     if st.session_state.get("is_admin", False):
         st.success("Ви вже в режимі організатора.")
         if st.button("Вийти з режиму організатора"):
@@ -461,6 +417,8 @@ pg = st.navigation([PAGE_WELCOME, PAGE_TABLE, PAGE_GAMES, PAGE_ADMIN], position=
 is_admin = st.session_state.get("is_admin", False)
 
 with st.sidebar:
+    st.markdown('<div class="brand"><div class="lg">🏆</div><div><b>Dota 2 · ФТІ КПІ</b>'
+                '<span>Турнірна система</span></div></div>', unsafe_allow_html=True)
     st.page_link(PAGE_WELCOME, label="Привітання", icon="🏠")
     st.page_link(PAGE_TABLE, label="Турнірна таблиця", icon="🏆")
     st.page_link(PAGE_GAMES, label="Ігри та аналіз", icon="📊")
@@ -476,20 +434,6 @@ with st.sidebar:
     if is_admin:
         st.divider()
         st.header("Керування турніром")
-        if config.api_key():
-            st.caption("🤖 AI: ключ Gemini підхоплено. Модель: %s." % config.model())
-        else:
-            try:
-                found = ", ".join(str(k) for k in st.secrets.keys()) or "порожньо"
-            except Exception:
-                found = "Secrets не знайдено"
-            st.warning("🤖 AI: ключ Gemini не знайдено. Назви, які бачить сайт у Secrets: %s. "
-                       "Потрібна назва gemini_api_key." % found)
-        if storage.is_persistent():
-            st.caption("💾 Сховище: PostgreSQL. Дані зберігаються постійно.")
-        else:
-            st.info("💾 Дані лежать у локальному файлі tournament.db. На Streamlit Cloud він "
-                    "тимчасовий і може зникнути при перезапуску: додайте database_url у Secrets.")
         if st.button("Вийти з режиму організатора"):
             st.session_state["is_admin"] = False
             st.rerun()
@@ -531,15 +475,11 @@ with st.sidebar:
     QR_PATH = Path(__file__).with_name("qr.png")
     if QR_PATH.exists():
         qr_b64 = base64.b64encode(QR_PATH.read_bytes()).decode()
-        st.divider()
         st.markdown(
-            '<div style="text-align:center">'
-            '<div style="font-weight:700;margin-bottom:8px">Підтримайте розробників 🫶❤️</div>'
+            '<div class="supp"><div class="st">Підтримайте розробників 🫶❤️</div>'
             '<a href="%s" target="_blank" rel="noopener noreferrer">'
-            '<img src="data:image/png;base64,%s" '
-            'style="width:100%%;max-width:220px;cursor:pointer"></a>'
-            '<div style="color:#9A93D1;font-size:.8rem;margin-top:6px">'
-            'Натисніть на код, щоб відкрити банку</div></div>' % (JAR_URL, qr_b64),
+            '<img src="data:image/png;base64,%s"></a>'
+            '<div class="hint">Натисніть на код, щоб відкрити банку</div></div>' % (JAR_URL, qr_b64),
             unsafe_allow_html=True)
 
 if "flash" in st.session_state:
