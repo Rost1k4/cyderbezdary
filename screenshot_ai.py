@@ -14,7 +14,9 @@ import config
 
 TIMEOUT = 350
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"  # змінюється в Secrets: gemini_model
+DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+DEFAULT_OPENROUTER_MODEL = "qwen/qwen-vl-plus:free"
 MAX_IMAGES = 4
 MAX_BYTES = 8_000_000
 ALLOWED_MIME = ("image/png", "image/jpeg", "image/webp")
@@ -144,6 +146,43 @@ def empty_template():
 
 
 # ------------------------------------------------------------ провайдери
+
+def _openrouter(images, key, model):
+    content = [{"type": "text", "text": PROMPT}]
+    for data, mime in images:
+        data_url = f"data:{mime};base64,{base64.b64encode(data).decode()}"
+        content.append({"type": "image_url", "image_url": {"url": data_url}})
+
+    payload = {
+        "model": model,
+        "messages": [{"role": "user", "content": content}],
+        "temperature": 0,
+    }
+    try:
+        resp = requests.post(
+            OPENROUTER_URL,
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            json=payload,
+            timeout=TIMEOUT,
+        )
+    except requests.exceptions.Timeout:
+        raise VisionError("OpenRouter не відповів вчасно. Спробуйте ще раз.")
+    except requests.exceptions.RequestException as e:
+        raise VisionError(f"Не вдалося звʼязатися з OpenRouter: {e}")
+
+    if resp.status_code in (401, 403):
+        raise VisionError("OpenRouter відхилив ключ. Перевірте OPENROUTER_API_KEY.")
+    if resp.status_code == 429:
+        raise VisionError("Перевищено ліміт запитів OpenRouter. Зачекайте хвилину і повторіть.")
+    if resp.status_code != 200:
+        raise VisionError(f"OpenRouter повернув код {resp.status_code}: {resp.text}")
+
+    try:
+        return resp.json()["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError, ValueError):
+        raise VisionError("OpenRouter не повернув коректну відповідь.")
+
+
 def _gemini(images, key, model):
     parts = [{"text": PROMPT}] + [
         {"inline_data": {"mime_type": mime, "data": base64.b64encode(data).decode()}}
@@ -194,12 +233,13 @@ def _ollama(images, host, model):
         raise VisionError("Ollama повернула некоректну відповідь.")
 
 
-def configured(gemini_key=None, ollama_model=None):
-    return bool((gemini_key or config.api_key()) or ollama_model)
+def configured(gemini_key=None, ollama_model=None, openrouter_key=None):
+    return bool(gemini_key or ollama_model or openrouter_key)
 
 
-def extract(images, gemini_key=None, gemini_model=None, ollama_host=None, ollama_model=None):
-    """images: [(bytes, mime)]. Gemini, якщо є ключ, інакше Ollama, якщо задано vision-модель."""
+def extract(images, gemini_key=None, gemini_model=None, ollama_host=None, ollama_model=None,
+            openrouter_key=None, openrouter_model=None):
+    """images: [(bytes, mime)]. Gemini, якщо є ключ, інакше OpenRouter/ Ollama, якщо задано vision-модель."""
     if not images:
         raise VisionError("Додайте хоча б один скріншот.")
     if len(images) > MAX_IMAGES:
@@ -210,13 +250,14 @@ def extract(images, gemini_key=None, gemini_model=None, ollama_host=None, ollama
         if len(data) > MAX_BYTES:
             raise VisionError("Файл завеликий (максимум 8 МБ).")
 
-    gemini_key = gemini_key or config.api_key()
-    gemini_model = gemini_model or config.model() or DEFAULT_GEMINI_MODEL
-
-    if gemini_key:
-        raw = _gemini(images, gemini_key, gemini_model)
+    # Підтримуємо як секрети сайту, так і змінні середовища.
+    if openrouter_key:
+        raw = _openrouter(images, openrouter_key, openrouter_model or DEFAULT_OPENROUTER_MODEL)
+    elif gemini_key:
+        raw = _gemini(images, gemini_key, gemini_model or DEFAULT_GEMINI_MODEL)
     elif ollama_model:
         raw = _ollama(images, ollama_host or "http://localhost:11434", ollama_model)
     else:
-        raise VisionError("AI для скріншотів не налаштований: додайте GEMINI_API_KEY або gemini_api_key у Secrets.")
+        raise VisionError("AI для скріншотів не налаштований: додайте OPENROUTER_API_KEY або gemini_api_key у Secrets.")
     return parse(raw)
+

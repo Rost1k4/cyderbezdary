@@ -386,23 +386,26 @@ def screenshot_admin():
     saved = storage.get_match_stats().get(mk, {}).get(game)
     base = "%s_%d" % (mk, game)
 
-    key_g = secret("gemini_api_key", "GEMINI_API_KEY") or config.api_key()
-    model_g = secret("gemini_model", "GEMINI_MODEL") or config.model()
+    key_g, model_g = secret("gemini_api_key", "GEMINI_API_KEY"), secret("gemini_model", "GEMINI_MODEL")
+    openrouter_key = secret("openrouter_api_key", "OPENROUTER_API_KEY")
+    openrouter_model = secret("openrouter_model", "OPENROUTER_MODEL") or "qwen/qwen-vl-plus:free"
     host_o, model_o = secret("ollama_host", "OLLAMA_HOST"), secret("ollama_vision_model", "OLLAMA_VISION_MODEL")
-    if not screenshot_ai.configured(key_g, model_o):
-        st.info("AI для скріншотів не налаштований (додайте gemini_api_key у Secrets), "
+    if not screenshot_ai.configured(key_g, model_o, openrouter_key):
+        st.info("AI для скріншотів не налаштований (додайте gemini_api_key або openrouter_api_key у Secrets), "
                 "але таблицю можна заповнити вручну.")
     files = st.file_uploader("Скріншот(и) кінця матчу: PNG, JPG або WEBP (до %d файлів)" % screenshot_ai.MAX_IMAGES,
                              type=["png", "jpg", "jpeg", "webp"], accept_multiple_files=True,
                              key="ssf_" + base)
     c1, c2, _ = st.columns([1, 1, 2])
     if c1.button("🔍 Розпізнати", type="primary", key="ssgo_" + base,
-                 disabled=not files or not screenshot_ai.configured(key_g, model_o)):
+                 disabled=not files or not screenshot_ai.configured(key_g, model_o, openrouter_key)):
         try:
             with st.spinner("AI читає таблицю зі скріншота..."):
                 draft = screenshot_ai.extract([(f.getvalue(), f.type) for f in files],
                                               gemini_key=key_g, gemini_model=model_g,
-                                              ollama_host=host_o, ollama_model=model_o)
+                                              ollama_host=host_o, ollama_model=model_o,
+                                              openrouter_key=openrouter_key,
+                                              openrouter_model=openrouter_model)
             st.session_state["ssd_" + base] = draft
             st.session_state["ssv_" + base] = st.session_state.get("ssv_" + base, 0) + 1
         except screenshot_ai.VisionError as e:
