@@ -64,10 +64,32 @@ def _is_radiant(p):
     return p.get("player_slot", 0) < 128
 
 
+def _hero(p, heroes):
+    """Назва героя: hero_name (зі скріншота) або за hero_id з OpenDota."""
+    if p.get("hero_name"):
+        return html.escape(str(p["hero_name"]))
+    hid = p.get("hero_id")
+    if hid is None:
+        return "н/д"
+    return html.escape(heroes.get(hid, "Hero #%s" % hid))
+
+
 def _duration(seconds):
     if not isinstance(seconds, (int, float)):
         return "н/д"
     return "%d:%02d" % (int(seconds) // 60, int(seconds) % 60)
+
+
+def _compact_side(title, players, heroes):
+    rows = []
+    for p in players:
+        name = html.escape(p.get("personaname") or p.get("name") or "Анонім")
+        rows.append("<tr><td>%s</td><td>%s</td><td>%s/%s/%s</td><td>%s</td><td>%s</td></tr>"
+                    % (name, _hero(p, heroes), _v(p, "kills"), _v(p, "deaths"), _v(p, "assists"),
+                       _v(p, "gold_per_min"), _v(p, "hero_damage")))
+    return ('<div class="side">%s</div><table><tr><th>Гравець</th><th>Герой</th>'
+            '<th>K/D/A</th><th>GPM</th><th>Шкода</th></tr>%s</table>'
+            % (html.escape(title), "".join(rows)))
 
 
 def match_stats_html(match, heroes, parsed=True):
@@ -81,18 +103,7 @@ def match_stats_html(match, heroes, parsed=True):
              % (winner, _duration(match.get("duration")),
                 _v(match, "radiant_score"), _v(match, "dire_score"), mid)]
     for title, flag in (("Radiant", True), ("Dire", False)):
-        rows = []
-        for p in players:
-            if _is_radiant(p) != flag:
-                continue
-            name = html.escape(p.get("personaname") or p.get("name") or "Анонім")
-            hero = html.escape(heroes.get(p.get("hero_id"), "Hero #%s" % p.get("hero_id")))
-            rows.append("<tr><td>%s</td><td>%s</td><td>%s/%s/%s</td><td>%s</td><td>%s</td></tr>"
-                        % (name, hero, _v(p, "kills"), _v(p, "deaths"), _v(p, "assists"),
-                           _v(p, "gold_per_min"), _v(p, "hero_damage")))
-        parts.append('<div class="side">%s</div><table><tr><th>Гравець</th><th>Герой</th>'
-                     '<th>K/D/A</th><th>GPM</th><th>Шкода</th></tr>%s</table>'
-                     % (title, "".join(rows)))
+        parts.append(_compact_side(title, [p for p in players if _is_radiant(p) == flag], heroes))
     if not parsed:
         parts.append('<div class="note">Матч ще не розібраний повністю: частина даних може бути відсутня.</div>')
     parts.append('<div class="note">Усі гравці, предмети та AI-оцінка: сторінка «Ігри та аналіз».</div>')
@@ -127,7 +138,7 @@ def players_table_html(players, heroes, title):
     rows = []
     for p in players:
         name = html.escape(p.get("personaname") or p.get("name") or "Анонім")
-        hero = html.escape(heroes.get(p.get("hero_id"), "Hero #%s" % p.get("hero_id")))
+        hero = _hero(p, heroes)
         kda = "/".join(_fmt(_num(p, k)) for k in ("kills", "deaths", "assists"))
         lhdn = "/".join(_fmt(_num(p, k)) for k in ("last_hits", "denies"))
         cells = ['<td>%s</td>' % name, '<td>%s</td>' % hero,
@@ -140,6 +151,34 @@ def players_table_html(players, heroes, title):
     return ('<div class="pt-wrap"><div class="pt-title">%s</div><table class="pt">'
             '<thead><tr>%s</tr></thead><tbody>%s</tbody></table></div>'
             % (html.escape(title), head, "".join(rows)))
+
+
+def screenshot_stats_html(games, full=False):
+    """Статистика, розпізнана зі скріншотів: games = {номер_гри: дані}.
+
+    full=False: компактні таблиці для розкритої картки; full=True: повні таблиці.
+    """
+    parts = []
+    for no in sorted(games):
+        d = games[no]
+        rt, dt = d.get("radiant_team"), d.get("dire_team")
+        r_label = "Radiant" + (" · %s" % rt if rt else "")
+        d_label = "Dire" + (" · %s" % dt if dt else "")
+        win = d.get("radiant_win")
+        winner = r_label if win is True else d_label if win is False else "н/д"
+        bits = ["Переможець: <b>%s</b>" % html.escape(winner)]
+        if d.get("duration"):
+            bits.append("тривалість %s" % html.escape(str(d["duration"])))
+        if d.get("radiant_score") is not None or d.get("dire_score") is not None:
+            bits.append("вбивства %s:%s" % (_fmt(d.get("radiant_score")), _fmt(d.get("dire_score"))))
+        if len(games) > 1:
+            parts.append('<div class="side">Гра %d</div>' % no)
+        parts.append('<div class="sum">%s</div>' % " · ".join(bits))
+        players = d.get("players") or []
+        for label, team in ((r_label, "radiant"), (d_label, "dire")):
+            side = [p for p in players if p.get("team") == team]
+            parts.append(players_table_html(side, {}, label) if full else _compact_side(label, side, {}))
+    return "".join(parts)
 
 
 # ------------------------------------------------------------- сітка
@@ -164,12 +203,15 @@ def match_card(slot, stats=None):
         return '<div class="m %s">%s</div>' % (slot["status"], body)
 
     mid = result.get("dota_match_id")
-    if not mid:
-        detail = '<div class="note">Dota Match ID не вказано, статистики немає.</div>'
-    elif stats and mid in stats:
-        detail = stats[mid]
-    else:
-        detail = '<div class="note">Статистика недоступна.</div>'
+    shots = stats.get("ss:" + slot["key"]) if stats else None
+    details = [shots] if shots else []
+    if mid and stats and mid in stats:
+        details.append(stats[mid])
+    elif mid and not shots:
+        details.append('<div class="note">Статистика недоступна.</div>')
+    if not details:
+        details.append('<div class="note">Статистику ще не додано.</div>')
+    detail = "".join(details)
     return ('<details class="m done"><summary>%s</summary><div class="stats">%s</div></details>'
             % (body, detail))
 
