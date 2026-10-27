@@ -21,8 +21,8 @@ import home_html
 import opendota
 import storage
 import tournament as T
-from bracket_html import bracket_html, match_stats_html
-from matchview import format_duration, is_radiant, player_name, val
+from bracket_html import bracket_html, match_stats_html, players_table_html
+from matchview import format_duration, is_radiant, val
 
 REFRESH_SECONDS = 10
 
@@ -73,6 +73,14 @@ button[role="tab"][aria-selected="true"]{color:#8B6CFF}
 [data-testid="stAlert"]{border-radius:12px;border:1px solid #3A3180}
 [data-testid="stExpander"]{background:#1C1745;border:1px solid #3A3180;border-radius:12px}
 [data-testid="stMetric"]{background:#1C1745;border:1px solid #3A3180;border-radius:12px;padding:12px 16px}
+.pt-wrap{margin:10px 0 18px;overflow-x:auto;border:1px solid #3A3180;border-radius:14px;background:#1C1745}
+.pt-title{padding:10px 16px;background:#241E5A;font-family:"Unbounded","Arial Black",sans-serif;font-size:.85rem;border-left:4px solid #8B6CFF}
+.pt{width:100%;border-collapse:collapse;font-size:.88rem}
+.pt th{padding:9px 14px;text-align:left;color:#9A93D1;font-weight:600;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid #3A3180;white-space:nowrap}
+.pt td{padding:9px 14px;border-bottom:1px solid rgba(58,49,128,.45);white-space:nowrap}
+.pt th.n,.pt td.n{text-align:right;font-variant-numeric:tabular-nums}
+.pt tr:last-child td{border-bottom:0}.pt tbody tr:hover{background:rgba(139,108,255,.1)}
+.pt td.top{color:#35D6A0;font-weight:700}
 </style>"""
 st.markdown(PAGE_CSS.replace("\n", "") + home_html.CSS.replace("\n", ""), unsafe_allow_html=True)
 
@@ -166,32 +174,6 @@ def load_stats(mids, heroes):
     return {m: store[m][1] for m in mids if m in store}
 
 
-PLAYER_NUM_COLS = ["K", "D", "A", "LH", "DN", "GPM", "XPM", "Шкода героям", "Шкода вежам"]
-PLAYER_COLUMN_CONFIG = {c: st.column_config.NumberColumn(c, format="%d") for c in PLAYER_NUM_COLS}
-
-
-def players_df(players, heroes):
-    """Таблиця гравців зі справжніми числами (правильне сортування та статистика колонок)."""
-    rows = []
-    for p in players:
-        rows.append({
-            "Гравець": player_name(p),
-            "Герой": heroes.get(p.get("hero_id"), "Hero #%s" % p.get("hero_id")),
-            "K": p.get("kills"), "D": p.get("deaths"), "A": p.get("assists"),
-            "LH": p.get("last_hits"), "DN": p.get("denies"),
-            "GPM": p.get("gold_per_min"), "XPM": p.get("xp_per_min"),
-            "Шкода героям": p.get("hero_damage"), "Шкода вежам": p.get("tower_damage"),
-        })
-    df = pd.DataFrame(rows)
-    for col in PLAYER_NUM_COLS:  # відсутні дані стають порожніми, а не "н/д" чи нулем
-        df[col] = pd.to_numeric(df[col], errors="coerce").astype("Int64")
-    return df
-
-
-def show_players(players, heroes):
-    st.dataframe(players_df(players, heroes), hide_index=True, column_config=PLAYER_COLUMN_CONFIG)
-
-
 def render_match_analysis(mid, scope):
     """Статистика матчу + AI. scope робить ключі кнопок унікальними на сторінці."""
     try:
@@ -228,10 +210,9 @@ def render_match_analysis(mid, scope):
         st.info(st.session_state[ai_key])
 
     players = match["players"]
-    st.markdown("**Radiant**")
-    show_players([p for p in players if is_radiant(p)], heroes)
-    st.markdown("**Dire**")
-    show_players([p for p in players if not is_radiant(p)], heroes)
+    for title, flag in (("Radiant", True), ("Dire", False)):
+        st.markdown(players_table_html([p for p in players if is_radiant(p) == flag], heroes, title),
+                    unsafe_allow_html=True)
 
 
 # --------------------------------------------- публічні блоки (самооновлення)
