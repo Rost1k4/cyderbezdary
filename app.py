@@ -5,13 +5,11 @@
 Є ще прихована сторінка входу організатора: /admin (її немає в меню).
 Вносити результати та керувати командами може лише організатор за паролем.
 """
-import base64
 import hmac
 import html
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 
 import pandas as pd
 import streamlit as st
@@ -31,7 +29,6 @@ EVENT_NAME = "Турнір з Dota 2"
 EVENT_DATE = "Дата уточнюється"
 EVENT_PLACE = "ФТІ КПІ ім. Ігоря Сікорського"
 STREAM_URL = ""  # встав посилання на стрім, напр. "https://www.twitch.tv/..."
-JAR_URL = "https://send.monobank.ua/jar/usfzttkbh"
 
 st.set_page_config(page_title="Dota 2 · ФТІ КПІ", page_icon="🏆", layout="wide")
 storage.init_db()
@@ -59,9 +56,6 @@ h1,h2,h3{font-family:"Unbounded","Arial Black",system-ui,sans-serif !important;l
 .stream-btn{display:block;text-align:center;background:linear-gradient(135deg,#8B6CFF,#C45CFF);color:#fff !important;padding:11px 12px;border-radius:12px;font-weight:700;text-decoration:none !important;margin:12px 0;box-shadow:0 8px 22px rgba(139,108,255,.35);transition:transform .2s,box-shadow .2s}
 .stream-btn:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(139,108,255,.5)}
 .stream-btn.off{background:#241E5A;color:#9A93D1 !important;border:1px solid #3A3180;box-shadow:none}
-.supp{margin-top:8px;padding:14px 10px;text-align:center;border:1px solid #3A3180;border-radius:16px;background:rgba(36,30,90,.55)}
-.supp .st{font-weight:700;margin-bottom:8px;font-size:.9rem}.supp img{width:100%;max-width:200px;cursor:pointer;transition:transform .2s}.supp img:hover{transform:scale(1.04)}
-.supp .hint{color:#9A93D1;font-size:.76rem;margin-top:6px}
 [data-testid="stBaseButton-secondary"],[data-testid="stBaseButton-secondaryFormSubmit"]{border-radius:10px;border:1px solid #3A3180;background:#1C1745;transition:transform .15s,border-color .15s}
 [data-testid="stBaseButton-secondary"]:hover,[data-testid="stBaseButton-secondaryFormSubmit"]:hover{border-color:#8B6CFF;transform:translateY(-1px)}
 [data-testid="stBaseButton-primary"],[data-testid="stBaseButton-primaryFormSubmit"]{border:0;border-radius:10px;background:linear-gradient(135deg,#8B6CFF,#6F4FE8);box-shadow:0 6px 18px rgba(139,108,255,.35);transition:transform .15s,box-shadow .15s}
@@ -462,16 +456,6 @@ with st.sidebar:
                     storage.reset_all()
                     flash("Турнір скинуто.")
                     st.rerun()
-
-    QR_PATH = Path(__file__).with_name("qr.png")
-    if QR_PATH.exists():
-        qr_b64 = base64.b64encode(QR_PATH.read_bytes()).decode()
-        st.markdown(
-            '<div class="supp"><div class="st">Підтримайте розробників 🫶❤️</div>'
-            '<a href="%s" target="_blank" rel="noopener noreferrer">'
-            '<img src="data:image/png;base64,%s"></a>'
-            '<div class="hint">Натисніть на код, щоб відкрити банку</div></div>' % (JAR_URL, qr_b64),
-            unsafe_allow_html=True)
 
 if "flash" in st.session_state:
     kind, message = st.session_state.pop("flash")
