@@ -633,8 +633,6 @@ def welcome_page():
     st.markdown(home_html.welcome_html(teams, started, bo, slots, EVENT_DATE, EVENT_PLACE, STREAM_URL),
                 unsafe_allow_html=True)
     st.write("")
-    st.info("Учасникам: перед грою ввімкніть у Dota 2 «Журнал матчів доступний усім» "
-            "(Налаштування → Спільнота → Параметри), інакше статистика матчу не з'явиться.")
     b1, b2, _ = st.columns([1, 1, 3])
     b1.page_link(PAGE_TABLE, label="Турнірна таблиця", icon="🏆")
     b2.page_link(PAGE_GAMES, label="Ігри та аналіз", icon="📊")
