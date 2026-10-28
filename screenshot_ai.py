@@ -38,6 +38,8 @@ The images may show different tabs of the SAME match: merge them into ONE record
   "duration": "MM:SS" | null,
   "radiant_score": integer | null,
   "dire_score": integer | null,
+  "radiant_team": string | null,
+  "dire_team": string | null,
   "players": [
    {"team": "radiant" | "dire", "name": string | null, "hero_name": string | null,
     "kills": integer | null, "deaths": integer | null, "assists": integer | null,
@@ -48,7 +50,8 @@ The images may show different tabs of the SAME match: merge them into ONE record
 }
 Rules:
 - Radiant is the top group of 5 players (green side), Dire is the bottom group (red side).
-- "radiant_win" comes from the Radiant/Dire victory banner; null if not visible.
+- Determine the winner from the GREEN victory marker/highlight/badge on the result screen. The side with the green winner indicator wins, even if the other side has a larger number or score. Do NOT decide by comparing kills, score, K/D/A, or the largest number. If the green marker is not clearly visible, set radiant_win to null.
+- If actual team/clan names are visible, return them as radiant_team and dire_team exactly as displayed; do not mistake player names or hero names for team names. If not visible, use null.
 - name = the player nickname exactly as written. hero_name = the hero name as shown (any language), else null.
 - last_hits and denies come from "LH/DN" style columns. Convert values like "12.3k" to 12300.
 - Use null for anything you cannot read. NEVER guess or invent numbers.
@@ -118,6 +121,7 @@ def normalize(d):
             row["team"] = "radiant" if i < 5 else "dire"
     return {"radiant_win": _win(d.get("radiant_win")), "duration": _duration(d.get("duration")),
             "radiant_score": _int(d.get("radiant_score")), "dire_score": _int(d.get("dire_score")),
+            "radiant_team": _text(d.get("radiant_team")), "dire_team": _text(d.get("dire_team")),
             "players": players}
 
 
@@ -142,7 +146,7 @@ def empty_template():
     """Порожня таблиця для ручного заповнення: 5 Radiant + 5 Dire."""
     row = {k: None for k in NUM_KEYS}
     return {"radiant_win": None, "duration": None, "radiant_score": None, "dire_score": None,
-            "players": [dict(row, team=t, name=None, hero_name=None)
+            "radiant_team": None, "dire_team": None, "players": [dict(row, team=t, name=None, hero_name=None)
                         for t in ("radiant",) * 5 + ("dire",) * 5]}
 
 

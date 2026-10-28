@@ -19,6 +19,7 @@ import config
 import home_html
 import opendota
 import screenshot_ai
+import clipboard_paste
 import storage
 import tournament as T
 from bracket_html import bracket_html, match_stats_html, players_table_html, screenshot_stats_html
@@ -302,7 +303,7 @@ def results_admin():
                 st.rerun()
 
     with st.expander("📷 Додати матч через скріншот", expanded=False):
-        st.caption("Тут можна відразу вставити фото, вказати рахунок і переможця, а потім зберегти результат одним кліком.")
+        st.caption("Тут можна завантажити скріншот, попросити AI визначити переможця за зеленою позначкою, перевірити результат і зберегти його.")
         ready2 = [s for s in slots.values() if s["status"] == "ready"]
         if not ready2:
             st.info("Немає доступних матчів для додавання через скріншот.")
@@ -313,12 +314,53 @@ def results_admin():
             c1, c2 = st.columns(2)
             ss_score_a = c1.number_input("Рахунок (ліва команда):", 0, bo, 0, key="ss_score_a")
             ss_score_b = c2.number_input("Рахунок (права команда):", 0, bo, 0, key="ss_score_b")
-            ss_winner = st.selectbox("Переміг (загальний результат):", [slot["a"], slot["b"]], key="ss_winner")
             ss_match_id = st.text_input("Dota Match ID (необов'язково)", key="ss_match_id")
-            ss_files = st.file_uploader("Фото/скріншот матчу", type=["png", "jpg", "jpeg", "webp"], accept_multiple_files=True, key="ss_uploader_inline")
+            st.caption("Додайте скріншот результатів. AI визначає переможця за зеленою позначкою, а не за найбільшим числом. Перевірте розпізнавання перед збереженням.")
+            pasted_images = clipboard_paste.paste_images(key="ss_clipboard_inline") or []
+            ss_files = st.file_uploader("Або завантаж фото/скріншот матчу (можна кілька)", type=["png", "jpg", "jpeg", "webp"], accept_multiple_files=True, key="ss_uploader_inline")
+            image_inputs = [(f.getvalue(), f.type or "image/png") for f in (ss_files or [])]
+            image_inputs.extend((__import__("base64").b64decode(item["data"]), item.get("mime", "image/png")) for item in pasted_images if item.get("data"))
+            ai_ready = screenshot_ai.configured(secret("gemini_api_key", "GEMINI_API_KEY"), secret("ollama_vision_model", "OLLAMA_VISION_MODEL"), secret("openrouter_api_key", "OPENROUTER_API_KEY"))
+            if st.button("🔍 Проаналізувати скріншот і визначити переможця", key="ss_analyze_inline", disabled=not image_inputs or not ai_ready):
+                try:
+                    with st.spinner("AI аналізує скріншот і шукає зелену позначку переможця..."):
+                        draft = screenshot_ai.extract(image_inputs,
+                            gemini_key=secret("gemini_api_key", "GEMINI_API_KEY"),
+                            gemini_model=secret("gemini_model", "GEMINI_MODEL"),
+                            ollama_host=secret("ollama_host", "OLLAMA_HOST"),
+                            ollama_model=secret("ollama_vision_model", "OLLAMA_VISION_MODEL"),
+                            openrouter_key=secret("openrouter_api_key", "OPENROUTER_API_KEY"),
+                            openrouter_model=secret("openrouter_model", "OPENROUTER_MODEL") or "google/gemini-2.5-flash")
+                    st.session_state["ss_ai_draft_inline"] = draft
+                    rt = (draft.get("radiant_team") or "").strip().casefold()
+                    dt = (draft.get("dire_team") or "").strip().casefold()
+                    a_name, b_name = slot["a"].strip().casefold(), slot["b"].strip().casefold()
+                    radiant_is_a = rt and rt == a_name
+                    radiant_is_b = rt and rt == b_name
+                    dire_is_a = dt and dt == a_name
+                    dire_is_b = dt and dt == b_name
+                    winner_team = None
+                    if draft.get("radiant_win") is True:
+                        winner_team = slot["a"] if radiant_is_a else slot["b"] if radiant_is_b else None
+                    elif draft.get("radiant_win") is False:
+                        winner_team = slot["a"] if dire_is_a else slot["b"] if dire_is_b else None
+                    if winner_team:
+                        st.session_state["ss_winner"] = winner_team
+                        st.success("AI знайшов зелену позначку й зіставив назву команди: %s. Перевірте нижче." % winner_team)
+                    elif draft.get("radiant_win") is not None:
+                        st.warning("AI визначив переможну сторону за зеленою позначкою, але назви команд на скріншоті не збіглися з командами турніру. Виберіть переможця вручну — не можна безпечно вгадувати відповідність Radiant/Dire.")
+                    if draft.get("radiant_team") or draft.get("dire_team"):
+                        st.caption("Назви, які побачив AI: Radiant — %s; Dire — %s" % (draft.get("radiant_team") or "не розпізнано", draft.get("dire_team") or "не розпізнано"))
+                    if draft.get("radiant_win") is None:
+                        st.warning("Зелена позначка переможця не розпізнана впевнено. Виберіть переможця вручну.")
+                except screenshot_ai.VisionError as e:
+                    st.error(str(e))
+            ss_winner = st.selectbox("Переміг (загальний результат):", [slot["a"], slot["b"]], key="ss_winner")
+            if not ai_ready:
+                st.info("Для AI-аналізу додайте OPENROUTER_API_KEY або gemini_api_key у Secrets. Завантаження файлу доступне й без AI.")
             if st.button("💾 Зберегти матч зі скріншоту", type="primary"):
-                if not ss_files:
-                    st.warning("Немає фото. Додайте скріншот або введіть результат вручну вище.")
+                if not image_inputs:
+                    st.warning("Немає фото. Вставте скріншот через Ctrl+V або завантажте файл.")
                 else:
                     storage.save_result(slot["key"], int(ss_score_a), int(ss_score_b), ss_winner,
                                         ss_match_id.strip() or None)
@@ -426,15 +468,18 @@ def render_screenshot_stats_form(mk, key_prefix="ss"):
                 "але таблицю можна заповнити вручну.")
 
     st.caption("Можна перетягнути файл або вставити зі скілу: Ctrl+V у поле нижче.")
-    files = st.file_uploader("Скріншот(и) кінця матчу: PNG, JPG або WEBP (до %d файлів)" % screenshot_ai.MAX_IMAGES,
+    pasted = clipboard_paste.paste_images(key=f"{key_prefix}_ss_clip_{base}") or []
+    files = st.file_uploader("Або завантаж скріншот(и): PNG, JPG або WEBP (до %d файлів)" % screenshot_ai.MAX_IMAGES,
                             type=["png", "jpg", "jpeg", "webp"], accept_multiple_files=True,
                             key=f"{key_prefix}_ssf_{base}")
+    image_inputs = [(f.getvalue(), f.type or "image/png") for f in (files or [])]
+    image_inputs.extend((__import__("base64").b64decode(item["data"]), item.get("mime", "image/png")) for item in pasted if item.get("data"))
     c1, c2, _ = st.columns([1, 1, 2])
     if c1.button("🔍 Розпізнати", type="primary", key=f"{key_prefix}_ssgo_{base}",
-                 disabled=not files or not screenshot_ai.configured(key_g, model_o, openrouter_key)):
+                 disabled=not image_inputs or not screenshot_ai.configured(key_g, model_o, openrouter_key)):
         try:
             with st.spinner("AI читає таблицю зі скріншота..."):
-                draft = screenshot_ai.extract([(f.getvalue(), f.type) for f in files],
+                draft = screenshot_ai.extract(image_inputs,
                                               gemini_key=key_g, gemini_model=model_g,
                                               ollama_host=host_o, ollama_model=model_o,
                                               openrouter_key=openrouter_key,
@@ -450,7 +495,7 @@ def render_screenshot_stats_form(mk, key_prefix="ss"):
     draft = st.session_state.get("ssd_" + base)
     data = draft or saved
     if not data:
-        st.caption("Завантажте скріншот і натисніть «Розпізнати» або заповніть таблицю вручну.")
+        st.caption("Вставте скріншот через Ctrl+V у поле вище або завантажте файл, потім натисніть «Розпізнати». Можна також заповнити таблицю вручну.")
         return
     ver = st.session_state.get(f"{key_prefix}_ssv_{base}", 0)
     if draft:
