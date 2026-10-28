@@ -50,12 +50,6 @@ CSS = """<style>
 .path.wb{--c:#4F8CFF}.path.lb{--c:#C45CFF}.path.gf{--c:#FFD166}
 .bento{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:20px}
 .tile{background:#1C1745;border:1px solid #3A3180;border-radius:18px;padding:22px;transition:transform .2s,border-color .2s,box-shadow .2s}
-.tile-link {
-    display: block;
-    color: inherit !important;
-    text-decoration: none !important;
-    cursor: pointer;
-}
 .tile-link{display:block;color:inherit;text-decoration:none!important;position:relative;cursor:pointer}
 .tile-link:hover{transform:translateY(-3px);border-color:#8B6CFF;box-shadow:0 14px 34px rgba(139,108,255,.18);color:inherit}
 .tile-cta{display:inline-block;margin-top:14px;color:#A99AFF;font-weight:700;font-size:.82rem}
@@ -159,21 +153,12 @@ def welcome_html(teams, started, bo, slots, event_date, event_place, stream_url)
         '<div class="tile tile-link tile-disabled" aria-disabled="true" title="Посилання на стрім додамо пізніше">'
         '<h3>📺 Трансляція</h3><p>Посилання на стрім додамо пізніше.</p>%s</div>' % live
     )
-        bento = (
+    bento = (
         '<div class="sh"><div class="tag">Що на тебе чекає</div>'
         '<h2>Дивись і грай з <span class="grad">усіма даними</span></h2></div>'
         '<div class="bento">'
-        '<a class="tile tile-link" href="/bracket">'
-        '<h3>🏆 Жива сітка</h3>'
-        '<p>Хто з ким грає, хто пройшов далі і хто вибув, оновлюється сама.</p></a>'
-        '<a class="tile tile-link" href="/games">'
-        '<h3>📊 Статистика матчу</h3>'
-        '<p>K/D/A, GPM, шкода: статистика зіграних матчів.</p></a>'
-        '<a class="tile tile-link" href="/games">'
-        '<h3>🤖 AI-розбір</h3>'
-        '<p>Цікаві висновки, MVP та аналіз матчів від ШІ.</p></a>'
-        '<a class="tile tile-link" href="%s">'
-        '<h3>📺 Трансляція</h3>'
-        '<p>Найцікавіші матчі в прямому ефірі.</p>%s</a></div>'
-    ) % (html.escape(stream_url, quote=True) if stream_url else '#', live)
+        '<a class="tile tile-link" href="/bracket"><h3>🏆 Турнірна таблиця</h3><p>Відкрий сітку, результати матчів і місця команд.</p><span class="tile-cta">Відкрити таблицю ↗</span></a>'
+        '<a class="tile tile-link" href="/games"><h3>📊 Таблиця статистики</h3><p>K/D/A, GPM, шкода та інші показники гравців.</p><span class="tile-cta">Перейти до таблиць ↗</span></a>'
+        '<a class="tile tile-link" href="/games"><h3>🤖 Аналіз від ШІ</h3><p>Незвичайні висновки, MVP, поворотні моменти й історія матчу.</p><span class="tile-cta">Читати аналіз ↗</span></a>'
+        + stream_tile + '</div>')
     return banner + hero + ticker + facts_html(teams, started, bo, slots) + steps + bento
