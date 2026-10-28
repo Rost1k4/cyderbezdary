@@ -362,6 +362,7 @@ def render_screenshot_stats_form(mk, key_prefix="ss"):
     if not screenshot_ai.configured(key_g, model_o, openrouter_key):
         st.info("AI для скріншотів не налаштований (додайте gemini_api_key або openrouter_api_key у Secrets), але таблицю можна заповнити вручну.")
 
+    st.caption("Можна перетягнути файл або вставити зі скілу: Ctrl+V в поле нижче.")
     files = st.file_uploader("Скріншот(и) кінця матчу: PNG, JPG або WEBP (до %d файлів)" % screenshot_ai.MAX_IMAGES,
                             type=["png", "jpg", "jpeg", "webp"], accept_multiple_files=True,
                             key=f"{key_prefix}_ssf_{base}")
@@ -403,9 +404,13 @@ def render_screenshot_stats_form(mk, key_prefix="ss"):
     r_score = m3.text_input("Вбивства Radiant", value="" if data.get("radiant_score") is None else str(data["radiant_score"]), key=k + "rs")
     d_score = m4.text_input("Вбивства Dire", value="" if data.get("dire_score") is None else str(data["dire_score"]), key=k + "ds")
 
-    team_opts = ["не вказано", slot["a"], slot["b"]]
-    team_idx = team_opts.index(data["radiant_team"]) if data.get("radiant_team") in team_opts else 0
-    radiant_team = st.selectbox("Radiant: це команда", team_opts, index=team_idx, key=k + "rt")
+    st.caption("Команди на скріншоті часто відрізняються від назв у сітці. Впишіть точну назву, що видно на скріншоті.")
+    radiant_team_name = st.text_input("Radiant: команда зі скріншота",
+                                     value=(data.get("radiant_team") or slot["a"]).strip() if (data.get("radiant_team") or slot["a"]) else "",
+                                     key=k + "rt")
+    dire_team_name = st.text_input("Dire: команда зі скріншота",
+                                  value=(data.get("dire_team") or slot["b"]).strip() if (data.get("dire_team") or slot["b"]) else "",
+                                  key=k + "dt")
 
     cfg = {"Команда": st.column_config.SelectboxColumn("Команда", options=["Radiant", "Dire"], required=True)}
     cfg.update({label: st.column_config.NumberColumn(label, format="%d", step=1) for label, _ in SS_COLS[3:]})
@@ -417,14 +422,13 @@ def render_screenshot_stats_form(mk, key_prefix="ss"):
         if not players:
             st.error("Таблиця порожня.")
         else:
-            other = {slot["a"]: slot["b"], slot["b"]: slot["a"]}.get(radiant_team)
             storage.save_match_stats(mk, game, {
                 "radiant_win": {"Radiant": True, "Dire": False}.get(winner),
                 "duration": duration.strip() or None,
                 "radiant_score": _opt_int(r_score),
                 "dire_score": _opt_int(d_score),
-                "radiant_team": radiant_team if other else None,
-                "dire_team": other,
+                "radiant_team": radiant_team_name.strip() or None,
+                "dire_team": dire_team_name.strip() or None,
                 "players": players,
             })
             st.session_state.pop("ssd_" + base, None)
