@@ -285,7 +285,7 @@ def results_admin():
         score_b = c2.number_input("Рахунок: %s" % s["b"], 0, need, 0, key="sb_" + key)
         winner_op = st.selectbox("Переміг", [s["a"], s["b"]], index=0, key="winner_" + key)
         st.caption("Важливо: для скріншоту переможець — команда з зеленою позначкою/блоком, навіть якщо цифри на картці не збігаються з рахунком.")
-        dota_id = st.text_input("Dota Match ID, не ID лобі (необов'язково, для аналізу)",
+        dota_id = st.text_input("Dota Match ID",
                                 key="did_" + key)
         confirmed = st.checkbox("Підтверджую, що результат остаточний", key="cf_" + key)
         if st.button("Зберегти результат", type="primary", disabled=not confirmed):
