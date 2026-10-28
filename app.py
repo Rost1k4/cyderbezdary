@@ -631,57 +631,12 @@ def screenshot_admin():
 
 def welcome_page():
     teams, started, bo, results, slots = load_state()
-
-    st.markdown(
-        home_html.welcome_html(
-            teams, started, bo, slots,
-            EVENT_DATE, EVENT_PLACE, STREAM_URL
-        ),
-        unsafe_allow_html=True
-    )
-
-    st.markdown("""
-    <style>
-    div[data-testid="stPageLink"] a {
-        display: block;
-        background: #1c1740;
-        border: 1px solid #44347e;
-        border-radius: 16px;
-        padding: 20px;
-        min-height: 110px;
-        text-decoration: none !important;
-        transition: border-color .2s, transform .2s;
-    }
-    div[data-testid="stPageLink"] a:hover {
-        border-color: #a78bfa;
-        transform: translateY(-3px);
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-    c1, c2, c3 = st.columns(3)
-
-    with c1:
-        st.page_link(
-            PAGE_TABLE,
-            label="🏆 Турнірна таблиця",
-            help="Відкрити сітку та результати матчів"
-        )
-
-    with c2:
-        st.page_link(
-            PAGE_GAMES,
-            label="📊 Таблиця статистики",
-            help="K/D/A, GPM та інші показники"
-        )
-
-    with c3:
-        st.page_link(
-            PAGE_GAMES,
-            label="🤖 Аналіз від ШІ",
-            help="Статистика й аналіз матчів"
-        )
-
+    st.markdown(home_html.welcome_html(teams, started, bo, slots, EVENT_DATE, EVENT_PLACE, STREAM_URL),
+                unsafe_allow_html=True)
+    st.write("")
+    b1, b2, _ = st.columns([1, 1, 3])
+    b1.page_link(PAGE_TABLE, label="Турнірна таблиця", icon="🏆")
+    b2.page_link(PAGE_GAMES, label="Ігри та аналіз", icon="📊")
 
 
 def table_page():
