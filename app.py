@@ -303,7 +303,7 @@ def results_admin():
                 st.rerun()
 
     with st.expander("📷 Додати матч через скріншот", expanded=False):
-        st.caption("Тут можна завантажити скріншот, попросити AI визначити переможця за зеленою позначкою, перевірити результат і зберегти його.")
+        st.caption("Встав або завантаж скріншот. AI спробує заповнити всю статистику: переможця, тривалість, рахунок убивств, назви команд, героїв і всі колонки гравців. Перевір дані перед збереженням.")
         ready2 = [s for s in slots.values() if s["status"] == "ready"]
         if not ready2:
             st.info("Немає доступних матчів для додавання через скріншот.")
@@ -311,19 +311,14 @@ def results_admin():
             opts = {"%s: %s vs %s" % (s["key"], s["a"], s["b"]): s for s in ready2}
             chosen2 = st.selectbox("Матч для скріншота", list(opts), key="ss_result_match")
             slot = opts[chosen2]
-            c1, c2 = st.columns(2)
-            ss_score_a = c1.number_input("Рахунок (ліва команда):", 0, bo, 0, key="ss_score_a")
-            ss_score_b = c2.number_input("Рахунок (права команда):", 0, bo, 0, key="ss_score_b")
-            ss_match_id = st.text_input("Dota Match ID (необов'язково)", key="ss_match_id")
-            st.caption("Додайте скріншот результатів. AI визначає переможця за зеленою позначкою, а не за найбільшим числом. Перевірте розпізнавання перед збереженням.")
             pasted_images = clipboard_paste.paste_images(key="ss_clipboard_inline") or []
             ss_files = st.file_uploader("Або завантаж фото/скріншот матчу (можна кілька)", type=["png", "jpg", "jpeg", "webp"], accept_multiple_files=True, key="ss_uploader_inline")
             image_inputs = [(f.getvalue(), f.type or "image/png") for f in (ss_files or [])]
             image_inputs.extend((__import__("base64").b64decode(item["data"]), item.get("mime", "image/png")) for item in pasted_images if item.get("data"))
             ai_ready = screenshot_ai.configured(secret("gemini_api_key", "GEMINI_API_KEY"), secret("ollama_vision_model", "OLLAMA_VISION_MODEL"), secret("openrouter_api_key", "OPENROUTER_API_KEY"))
-            if st.button("🔍 Проаналізувати скріншот і визначити переможця", key="ss_analyze_inline", disabled=not image_inputs or not ai_ready):
+            if st.button("🔍 Проаналізувати весь скріншот", key="ss_analyze_inline", disabled=not image_inputs or not ai_ready):
                 try:
-                    with st.spinner("AI аналізує скріншот і шукає зелену позначку переможця..."):
+                    with st.spinner("AI зчитує всі доступні поля зі скріншота..."):
                         draft = screenshot_ai.extract(image_inputs,
                             gemini_key=secret("gemini_api_key", "GEMINI_API_KEY"),
                             gemini_model=secret("gemini_model", "GEMINI_MODEL"),
@@ -332,40 +327,99 @@ def results_admin():
                             openrouter_key=secret("openrouter_api_key", "OPENROUTER_API_KEY"),
                             openrouter_model=secret("openrouter_model", "OPENROUTER_MODEL") or "google/gemini-2.5-flash")
                     st.session_state["ss_ai_draft_inline"] = draft
+                    st.session_state["ss_ai_version_inline"] = st.session_state.get("ss_ai_version_inline", 0) + 1
                     rt = (draft.get("radiant_team") or "").strip().casefold()
                     dt = (draft.get("dire_team") or "").strip().casefold()
                     a_name, b_name = slot["a"].strip().casefold(), slot["b"].strip().casefold()
-                    radiant_is_a = rt and rt == a_name
-                    radiant_is_b = rt and rt == b_name
-                    dire_is_a = dt and dt == a_name
-                    dire_is_b = dt and dt == b_name
+                    radiant_is_a = bool(rt and rt == a_name)
+                    radiant_is_b = bool(rt and rt == b_name)
+                    dire_is_a = bool(dt and dt == a_name)
+                    dire_is_b = bool(dt and dt == b_name)
                     winner_team = None
                     if draft.get("radiant_win") is True:
                         winner_team = slot["a"] if radiant_is_a else slot["b"] if radiant_is_b else None
                     elif draft.get("radiant_win") is False:
                         winner_team = slot["a"] if dire_is_a else slot["b"] if dire_is_b else None
                     if winner_team:
-                        st.session_state["ss_winner"] = winner_team
-                        st.success("AI знайшов зелену позначку й зіставив назву команди: %s. Перевірте нижче." % winner_team)
-                    elif draft.get("radiant_win") is not None:
-                        st.warning("AI визначив переможну сторону за зеленою позначкою, але назви команд на скріншоті не збіглися з командами турніру. Виберіть переможця вручну — не можна безпечно вгадувати відповідність Radiant/Dire.")
-                    if draft.get("radiant_team") or draft.get("dire_team"):
-                        st.caption("Назви, які побачив AI: Radiant — %s; Dire — %s" % (draft.get("radiant_team") or "не розпізнано", draft.get("dire_team") or "не розпізнано"))
-                    if draft.get("radiant_win") is None:
-                        st.warning("Зелена позначка переможця не розпізнана впевнено. Виберіть переможця вручну.")
+                        st.session_state["ss_winner_inline"] = winner_team
+                    st.success("Розпізнавання завершено. Нижче показані всі дані, які AI зміг зчитати; перевір їх перед збереженням.")
                 except screenshot_ai.VisionError as e:
                     st.error(str(e))
-            ss_winner = st.selectbox("Переміг (загальний результат):", [slot["a"], slot["b"]], key="ss_winner")
             if not ai_ready:
                 st.info("Для AI-аналізу додайте OPENROUTER_API_KEY або gemini_api_key у Secrets. Завантаження файлу доступне й без AI.")
-            if st.button("💾 Зберегти матч зі скріншоту", type="primary"):
-                if not image_inputs:
-                    st.warning("Немає фото. Вставте скріншот через Ctrl+V або завантажте файл.")
-                else:
-                    storage.save_result(slot["key"], int(ss_score_a), int(ss_score_b), ss_winner,
-                                        ss_match_id.strip() or None)
-                    flash("Матч %s збережено зі скріншоту. Переможець: %s." % (slot["key"], ss_winner))
-                    st.rerun()
+
+            draft = st.session_state.get("ss_ai_draft_inline")
+            if draft:
+                st.markdown("#### Результат розпізнавання — перевір усі поля")
+                version = st.session_state.get("ss_ai_version_inline", 0)
+                prefix = f"ss_inline_{slot['key']}_{version}_"
+                known_radiant = (draft.get("radiant_team") or "").strip()
+                known_dire = (draft.get("dire_team") or "").strip()
+                col1, col2, col3, col4 = st.columns(4)
+                win_options = ["Не визначено", "Radiant", "Dire"]
+                win_index = {True: 1, False: 2}.get(draft.get("radiant_win"), 0)
+                parsed_winner = col1.selectbox("Переможець у грі", win_options, index=win_index, key=prefix + "win")
+                duration = col2.text_input("Тривалість", value=draft.get("duration") or "", key=prefix + "duration")
+                radiant_kills = col3.text_input("Убивства Radiant", value="" if draft.get("radiant_score") is None else str(draft.get("radiant_score")), key=prefix + "rscore")
+                dire_kills = col4.text_input("Убивства Dire", value="" if draft.get("dire_score") is None else str(draft.get("dire_score")), key=prefix + "dscore")
+                tc1, tc2 = st.columns(2)
+                radiant_team = tc1.text_input("Назва команди Radiant", value=known_radiant, key=prefix + "rteam")
+                dire_team = tc2.text_input("Назва команди Dire", value=known_dire, key=prefix + "dteam")
+                cfg = {"Команда": st.column_config.SelectboxColumn("Команда", options=["Radiant", "Dire"], required=True)}
+                cfg.update({label: st.column_config.NumberColumn(label, format="%d", step=1) for label, _ in SS_COLS[3:]})
+                edited = st.data_editor(stats_to_df(draft), column_config=cfg, num_rows="dynamic", hide_index=True, key=prefix + "players")
+                st.caption("Рахунок серії турніру (наприклад, BO3 2:1) відрізняється від кількості вбивств у конкретній грі, тому його введи окремо.")
+                map_default = 0
+                if known_radiant.strip().casefold() == slot["b"].strip().casefold():
+                    map_default = 1
+                radiant_tournament_team = st.selectbox(
+                    "Яка команда турніру грала за Radiant?",
+                    [slot["a"], slot["b"]], index=map_default, key=prefix + "radiant_mapping")
+                dire_tournament_team = slot["b"] if radiant_tournament_team == slot["a"] else slot["a"]
+                st.caption("Команда Dire у цьому матчі: %s. Якщо назви команд не видно на скріншоті, обери відповідність вручну." % dire_tournament_team)
+                sc1, sc2 = st.columns(2)
+                series_a = sc1.number_input("Рахунок серії: %s" % slot["a"], 0, bo, 0, key=prefix + "series_a")
+                series_b = sc2.number_input("Рахунок серії: %s" % slot["b"], 0, bo, 0, key=prefix + "series_b")
+                ss_match_id = st.text_input("Dota Match ID (необов'язково)", key=prefix + "match_id")
+                confirm = st.checkbox("Перевірив розпізнані дані та підтверджую результат", key=prefix + "confirm")
+                if st.button("💾 Зберегти результат і всю статистику", type="primary", key=prefix + "save", disabled=not confirm):
+                    err = T.validate_result(bo, int(series_a), int(series_b))
+                    if not err and ss_match_id.strip() and not ss_match_id.strip().isdigit():
+                        err = "Dota Match ID має складатися лише з цифр."
+                    if err:
+                        st.error(err)
+                    else:
+                        if parsed_winner == "Radiant":
+                            winner = radiant_tournament_team
+                        elif parsed_winner == "Dire":
+                            winner = dire_tournament_team
+                        else:
+                            winner = None
+                        score_winner = slot["a"] if series_a > series_b else slot["b"] if series_b > series_a else None
+                        if winner is None:
+                            st.error("AI не визначив переможну сторону за зеленою позначкою. Виправ поле «Переможець у грі» перед збереженням.")
+                        elif score_winner != winner:
+                            st.error("Переможець за рахунком серії не збігається з переможцем гри. Перевір рахунок серії або відповідність Radiant/Dire.")
+                        else:
+                            players = df_to_players(edited)
+                            if not players:
+                                st.error("У таблиці немає розпізнаних гравців. Перевір скріншот або додай гравців вручну.")
+                            else:
+                                storage.save_result(slot["key"], int(series_a), int(series_b), winner, ss_match_id.strip() or None)
+                                storage.save_match_stats(slot["key"], 1, {
+                                    "radiant_win": parsed_winner == "Radiant",
+                                    "duration": duration.strip() or None,
+                                    "radiant_score": _opt_int(radiant_kills),
+                                    "dire_score": _opt_int(dire_kills),
+                                    "radiant_team": radiant_team.strip() or None,
+                                    "dire_team": dire_team.strip() or None,
+                                    "players": players,
+                                })
+                                st.session_state.pop("ss_ai_draft_inline", None)
+                                flash("Результат матчу %s і статистику першої гри збережено." % slot["key"])
+                                st.rerun()
+            else:
+                st.caption("Після аналізу тут з'являться назви команд, переможець, тривалість, рахунок убивств і повна таблиця гравців.")
 
     editable = [k for k, s in slots.items()
                 if s["status"] == "done" and T.can_edit(size, results, k)]
