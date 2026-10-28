@@ -159,6 +159,6 @@ def welcome_html(teams, started, bo, slots, event_date, event_place, stream_url)
         '<div class="bento">'
         '<a class="tile tile-link" href="/bracket"><h3>🏆 Турнірна таблиця</h3><p>Відкрий сітку, результати матчів і місця команд.</p><span class="tile-cta">Відкрити таблицю ↗</span></a>'
         '<a class="tile tile-link" href="/games"><h3>📊 Таблиця статистики</h3><p>K/D/A, GPM, шкода та інші показники гравців.</p><span class="tile-cta">Перейти до таблиць ↗</span></a>'
-        '<a class="tile tile-link" href="/games">><h3>🤖 Аналіз від ШІ</h3><p>Незвичайні висновки, MVP, поворотні моменти й історія матчу.</p><span class="tile-cta">Читати аналіз ↗</span></a>'
+        '<a class="tile tile-link" href="/games"><h3>🤖 Аналіз від ШІ</h3><p>Незвичайні висновки, MVP, поворотні моменти й історія матчу.</p><span class="tile-cta">Читати аналіз ↗</span></a>'
         + stream_tile + '</div>')
     return banner + hero + ticker + facts_html(teams, started, bo, slots) + steps + bento
