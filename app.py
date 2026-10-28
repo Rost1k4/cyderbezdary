@@ -340,11 +340,6 @@ def results_admin():
                 flash("Результат %s скасовано." % undo_key, "warning")
                 st.rerun()
 
-    if selected_key:
-        st.divider()
-        with st.expander("📷 Статистика зі скріншота для цього матчу", expanded=True):
-            render_screenshot_stats_form(selected_key, key_prefix="result")
-
 
 # --------------------------------------------- статистика зі скріншота (організатор)
 def match_id_admin():
@@ -402,6 +397,16 @@ def df_to_players(df):
 def _opt_int(text):
     text = (text or "").strip()
     return int(text) if text.isdigit() else None
+
+
+def _clean_team_name(value):
+    """Фільтрує загальні ярлики Radiant/Dire, які не є реальними назвами команд."""
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if text.lower() in {"radiant", "dire", "не вказано", "not specified", "", "null", "none"}:
+        return ""
+    return text
 
 
 def render_screenshot_stats_form(mk, key_prefix="ss"):
@@ -465,10 +470,10 @@ def render_screenshot_stats_form(mk, key_prefix="ss"):
     d_score = m4.text_input("Вбивства Dire", value="" if data.get("dire_score") is None
                             else str(data["dire_score"]), key=k + "ds")
 
-    team_opts = ["не вказано", slot["a"], slot["b"]]
-    team_idx = team_opts.index(data["radiant_team"]) if data.get("radiant_team") in team_opts else 0
-    radiant_team = st.selectbox("Radiant: це команда", team_opts, index=team_idx, key=k + "rt")
-    dire_team = st.selectbox("Dire: це команда", team_opts, index=0 if data.get("dire_team") not in team_opts else team_opts.index(data["dire_team"]), key=k + "dt")
+    radiant_default = _clean_team_name(data.get("radiant_team")) or (slot["a"] if slot.get("a") else "")
+    dire_default = _clean_team_name(data.get("dire_team")) or (slot["b"] if slot.get("b") else "")
+    radiant_team = st.text_input("Radiant: команда", value=radiant_default, key=k + "rt")
+    dire_team = st.text_input("Dire: команда", value=dire_default, key=k + "dt")
 
     cfg = {"Команда": st.column_config.SelectboxColumn("Команда", options=["Radiant", "Dire"], required=True)}
     cfg.update({label: st.column_config.NumberColumn(label, format="%d", step=1) for label, _ in SS_COLS[3:]})
@@ -485,8 +490,8 @@ def render_screenshot_stats_form(mk, key_prefix="ss"):
                 "radiant_win": {"Radiant": True, "Dire": False}.get(winner),
                 "duration": duration.strip() or None,
                 "radiant_score": _opt_int(r_score), "dire_score": _opt_int(d_score),
-                "radiant_team": radiant_team if radiant_team != "не вказано" else None,
-                "dire_team": dire_team if dire_team != "не вказано" else None,
+                "radiant_team": _clean_team_name(radiant_team) or None,
+                "dire_team": _clean_team_name(dire_team) or None,
                 "players": players})
             st.session_state.pop("ssd_" + base, None)
             flash("Статистику матчу %s (гра %d) збережено." % (mk, game))
