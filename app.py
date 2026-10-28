@@ -26,11 +26,10 @@ from matchview import format_duration, is_radiant, val
 
 REFRESH_SECONDS = 10
 
-# ---- Налаштуй під себе ----
 EVENT_NAME = "Турнір з Dota 2"
 EVENT_DATE = "Дата уточнюється"
 EVENT_PLACE = "ФТІ КПІ ім. Ігоря Сікорського"
-STREAM_URL = ""  # встав посилання на стрім, напр. "https://www.twitch.tv/..."
+STREAM_URL = ""
 
 st.set_page_config(page_title="Dota 2 · ФТІ КПІ", page_icon="🏆", layout="wide")
 storage.init_db()
@@ -40,7 +39,7 @@ PAGE_CSS = """<style>
 [data-testid='stMainMenu'],[data-testid='stDeployButton'],.stAppDeployButton,[data-testid='stToolbarActions'],#MainMenu,footer{visibility:hidden;}
 [data-testid='stDecoration']{display:none;}
 [data-testid='stExpandSidebarButton'],[data-testid='stSidebarCollapseButton'],[data-testid='collapsedControl']{visibility:visible !important;}
-.stApp{background-color:#120F2E;background-image:radial-gradient(640px 420px at 92% -6%,rgba(139,108,255,.30),transparent 70%),radial-gradient(520px 380px at -4% 102%,rgba(79,140,255,.18),transpar[...]
+.stApp{background-color:#120F2E;background-image:radial-gradient(640px 420px at 92% -6%,rgba(139,108,255,.30),transparent 70%),radial-gradient(520px 420px at -4% 102%,rgba(79,140,255,.18),transparent 70%)}
 .stApp,.stApp p,.stApp label,.stApp button,.stApp input,.stApp textarea{font-family:"Onest",system-ui,-apple-system,"Segoe UI",sans-serif}
 h1,h2,h3{font-family:"Unbounded","Arial Black",system-ui,sans-serif !important;letter-spacing:-.01em}
 .block-container{padding-top:2.2rem;max-width:1280px}
@@ -55,12 +54,12 @@ h1,h2,h3{font-family:"Unbounded","Arial Black",system-ui,sans-serif !important;l
 [data-testid="stPageLink-NavLink"]{border-radius:10px;border:1px solid transparent;transition:background .2s,border-color .2s}
 [data-testid="stPageLink-NavLink"]:hover{background:rgba(139,108,255,.14);border-color:#3A3180}
 [data-testid="stPageLink-NavLink"][aria-current="page"]{background:linear-gradient(90deg,rgba(139,108,255,.32),rgba(139,108,255,.06));border-color:#3A3180}
-.stream-btn{display:block;text-align:center;background:linear-gradient(135deg,#8B6CFF,#C45CFF);color:#fff !important;padding:11px 12px;border-radius:12px;font-weight:700;text-decoration:none !impo[...]
+.stream-btn{display:block;text-align:center;background:linear-gradient(135deg,#8B6CFF,#C45CFF);color:#fff !important;padding:11px 12px;border-radius:12px;font-weight:700;text-decoration:none !important;transition:transform .2s,box-shadow .2s}
 .stream-btn:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(139,108,255,.5)}
 .stream-btn.off{background:#241E5A;color:#9A93D1 !important;border:1px solid #3A3180;box-shadow:none}
 [data-testid="stBaseButton-secondary"],[data-testid="stBaseButton-secondaryFormSubmit"]{border-radius:10px;border:1px solid #3A3180;background:#1C1745;transition:transform .15s,border-color .15s}
 [data-testid="stBaseButton-secondary"]:hover,[data-testid="stBaseButton-secondaryFormSubmit"]:hover{border-color:#8B6CFF;transform:translateY(-1px)}
-[data-testid="stBaseButton-primary"],[data-testid="stBaseButton-primaryFormSubmit"]{border:0;border-radius:10px;background:linear-gradient(135deg,#8B6CFF,#6F4FE8);box-shadow:0 6px 18px rgba(139,10[...]
+[data-testid="stBaseButton-primary"],[data-testid="stBaseButton-primaryFormSubmit"]{border:0;border-radius:10px;background:linear-gradient(135deg,#8B6CFF,#6F4FE8);box-shadow:0 6px 18px rgba(139,108,255,.35)}
 [data-baseweb="input"],[data-baseweb="select"]>div,[data-baseweb="textarea"]{border-radius:10px !important}
 button[role="tab"]{font-weight:600}
 button[role="tab"][aria-selected="true"]{color:#8B6CFF}
@@ -81,13 +80,10 @@ st.markdown(PAGE_CSS.replace("\n", "") + home_html.CSS.replace("\n", ""), unsafe
 
 
 def page_header(tag, title):
-    st.markdown('<div class="ph"><span class="tag">%s</span><h1>%s</h1></div>' % (tag, title),
-                unsafe_allow_html=True)
+    st.markdown('<div class="ph"><span class="tag">%s</span><h1>%s</h1></div>' % (tag, title), unsafe_allow_html=True)
 
 
-# ------------------------------------------------------------------ допоміжне
 def admin_password():
-    """Пароль організатора: змінна середовища або .streamlit/secrets.toml."""
     pw = os.environ.get("TOURNAMENT_ADMIN_PASSWORD")
     if pw:
         return pw
@@ -98,7 +94,6 @@ def admin_password():
 
 
 def secret(name, env_name=None):
-    """Значення з Secrets або змінної середовища (None, якщо не задано)."""
     value = os.environ.get(env_name or name.upper())
     if value:
         return value
@@ -134,27 +129,21 @@ def _cached_heroes():
 def cached_heroes():
     heroes = _cached_heroes()
     if not heroes:
-        _cached_heroes.clear()  # не кешуємо невдалий запит
+        _cached_heroes.clear()
     return heroes
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def cached_ai_short(match_id):
-    """Одна AI-оцінка на матч для всіх глядачів (економить запити). Помилки не кешуються."""
     return ai_review.short_review(opendota.get_match(match_id), _cached_heroes())
 
 
-# ---- статистика для розкритих карток у сітці (кеш в пам'яті сервера) ----
 @st.cache_resource
 def _stats_store():
     return {}
 
 
 def _fetch_stats(mid, heroes, store):
-    """Готує html статистики і кладе в кеш. Успіх кешується надовго, помилка ненадовго.
-
-    Працює у фоновому потоці, тому жодних викликів st.* тут немає.
-    """
     try:
         match = opendota.get_match(int(mid))
         parsed = opendota.is_parsed(match)
@@ -170,7 +159,6 @@ def _fetch_stats(mid, heroes, store):
 
 
 def load_stats(mids, heroes):
-    """{match_id: html} для всіх потрібних матчів; нові запити йдуть паралельно."""
     store = _stats_store()
     now = time.time()
     todo = [m for m in mids if not (m in store and now < store[m][0])]
@@ -181,7 +169,6 @@ def load_stats(mids, heroes):
 
 
 def render_match_analysis(mid, scope):
-    """Статистика матчу + AI. scope робить ключі кнопок унікальними на сторінці."""
     try:
         with st.spinner("Завантаження..."):
             match = cached_match(mid)
@@ -189,8 +176,7 @@ def render_match_analysis(mid, scope):
     except opendota.OpenDotaError as e:
         st.error(str(e))
         request_parse = getattr(opendota, "request_parse", None)
-        if request_parse and st.button("Запросити розбір в OpenDota",
-                                       key="rq_%s_%d" % (scope, mid)):
+        if request_parse and st.button("Запросити розбір в OpenDota", key="rq_%s_%d" % (scope, mid)):
             try:
                 request_parse(mid)
                 st.info("Запит надіслано. Спробуйте ще раз через 1-5 хвилин.")
@@ -198,9 +184,8 @@ def render_match_analysis(mid, scope):
                 st.error(str(e2))
         return
     winner = {True: "Radiant", False: "Dire"}.get(match.get("radiant_win"), "н/д")
-    st.write("Переможець: **%s**, тривалість: **%s**, рахунок: %s:%s"
-             % (winner, format_duration(match.get("duration")),
-                val(match, "radiant_score"), val(match, "dire_score")))
+    st.write("Переможець: **%s**, тривалість: **%s**, рахунок: %s:%s" % (
+        winner, format_duration(match.get("duration")), val(match, "radiant_score"), val(match, "dire_score")))
     if not opendota.is_parsed(match):
         st.warning("Матч ще не розібраний повністю: частина даних може бути відсутня.")
 
@@ -217,11 +202,9 @@ def render_match_analysis(mid, scope):
 
     players = match["players"]
     for title, flag in (("Radiant", True), ("Dire", False)):
-        st.markdown(players_table_html([p for p in players if is_radiant(p) == flag], heroes, title),
-                    unsafe_allow_html=True)
+        st.markdown(players_table_html([p for p in players if is_radiant(p) == flag], heroes, title), unsafe_allow_html=True)
 
 
-# --------------------------------------------- публічні блоки (самооновлення)
 @st.fragment(run_every=REFRESH_SECONDS)
 def bracket_view():
     teams, started, bo, results, slots = load_state()
@@ -233,11 +216,8 @@ def bracket_view():
     champ = T.champion(slots)
     if champ:
         st.success("🏆 Чемпіон турніру: **%s**" % champ)
-    st.caption("Формат матчів: BO%d. Бурштинова рамка: матч готовий до гри. М'ятна: завершено, "
-               "натисніть на завершений матч, щоб побачити статистику. "
-               "Сторінка оновлюється кожні %d с." % (bo, REFRESH_SECONDS))
-    mids = {s["result"]["dota_match_id"] for s in slots.values()
-            if s["result"] and s["result"]["dota_match_id"]}
+    st.caption("Формат матчів: BO%d. Бурштинова рамка: матч готовий до гри. М'ятна: завершено, натисніть на завершений матч, щоб побачити статистику. Сторінка оновлюється кожні %d с." % (bo, REFRESH_SECONDS))
+    mids = {s["result"]["dota_match_id"] for s in slots.values() if s["result"] and s["result"]["dota_match_id"]}
     stats = load_stats(mids, cached_heroes()) if mids else {}
     for key, games in storage.get_match_stats().items():
         stats["ss:" + key] = screenshot_stats_html(games)
@@ -252,14 +232,12 @@ def table_view():
         return
     rec = T.standings(teams, slots)
     table = pd.DataFrame([
-        {"Команда": t, "Статус": v["status"], "Перемоги": v["W"], "Поразки": v["L"],
-         "Мапи": "%d:%d" % (v["MW"], v["ML"])}
+        {"Команда": t, "Статус": v["status"], "Перемоги": v["W"], "Поразки": v["L"], "Мапи": "%d:%d" % (v["MW"], v["ML"])}
         for t, v in rec.items()
     ]).sort_values(["Перемоги", "Поразки"], ascending=[False, True])
     st.dataframe(table, hide_index=True)
 
 
-# ------------------------------------------------------ блок організатора
 def results_admin():
     teams, started, bo, results, slots = load_state()
     if not started:
@@ -268,6 +246,7 @@ def results_admin():
     size = len(teams)
     champ = T.champion(slots)
     st.subheader("Внести результат")
+    selected_key = None
     ready = [s for s in slots.values() if s["status"] == "ready"]
     if not ready:
         st.info("Турнір завершено." if champ else "Немає матчів, готових до гри.")
@@ -275,13 +254,13 @@ def results_admin():
         options = {"%s: %s vs %s" % (s["key"], s["a"], s["b"]): s["key"] for s in ready}
         chosen = st.selectbox("Матч", list(options))
         key = options[chosen]
+        selected_key = key
         s = slots[key]
         need = bo // 2 + 1
         c1, c2 = st.columns(2)
         score_a = c1.number_input("Рахунок: %s" % s["a"], 0, need, 0, key="sa_" + key)
         score_b = c2.number_input("Рахунок: %s" % s["b"], 0, need, 0, key="sb_" + key)
-        dota_id = st.text_input("Dota Match ID, не ID лобі (необов'язково, для аналізу)",
-                                key="did_" + key)
+        dota_id = st.text_input("Dota Match ID, не ID лобі (необов'язково, для аналізу)", key="did_" + key)
         confirmed = st.checkbox("Підтверджую, що результат остаточний", key="cf_" + key)
         if st.button("Зберегти результат", type="primary", disabled=not confirmed):
             err = T.validate_result(bo, int(score_a), int(score_b))
@@ -291,20 +270,16 @@ def results_admin():
                 st.error(err)
             else:
                 winner = T.winner_from_score(s["a"], s["b"], int(score_a), int(score_b))
-                storage.save_result(key, int(score_a), int(score_b), winner,
-                                    dota_id.strip() or None)
-                flash("Збережено %s: %s %d:%d %s. Переможець: %s."
-                      % (key, s["a"], score_a, score_b, s["b"], winner))
+                storage.save_result(key, int(score_a), int(score_b), winner, dota_id.strip() or None)
+                flash("Збережено %s: %s %d:%d %s. Переможець: %s." % (key, s["a"], score_a, score_b, s["b"], winner))
                 st.rerun()
 
-    editable = [k for k, s in slots.items()
-                if s["status"] == "done" and T.can_edit(size, results, k)]
+    editable = [k for k, s in slots.items() if s["status"] == "done" and T.can_edit(size, results, k)]
     with st.expander("Скасувати результат (виправлення помилки)"):
         if not editable:
             st.write("Немає результатів, які можна скасувати.")
         else:
-            st.caption("Скасувати можна лише матч, від якого ще не залежить жоден збережений "
-                       "результат. Для старішого матчу спочатку скасуйте пізніші.")
+            st.caption("Скасувати можна лише матч, від якого ще не залежить жоден збережений результат. Для старішого матчу спочатку скасуйте пізніші.")
             undo_key = st.selectbox("Матч", editable)
             undo_ok = st.checkbox("Підтверджую скасування", key="undo_ok")
             if st.button("Скасувати результат", disabled=not undo_ok):
@@ -312,10 +287,13 @@ def results_admin():
                 flash("Результат %s скасовано." % undo_key, "warning")
                 st.rerun()
 
+    if selected_key:
+        st.divider()
+        with st.expander("📷 Статистика зі скріншота для цього матчу", expanded=True):
+            render_screenshot_stats_form(selected_key, key_prefix="result")
 
-# ----------------------------------------- статистика зі скріншота (організатор)
+
 def match_id_admin():
-    """Додати або змінити Dota Match ID вже збереженого результату."""
     teams, started, bo, results, slots = load_state()
     played = [s for s in slots.values() if s["result"]] if started else []
     if not played:
@@ -324,8 +302,7 @@ def match_id_admin():
     options = {"%s: %s vs %s" % (s["key"], s["a"], s["b"]): s["key"] for s in played}
     mk = options[st.selectbox("Матч", list(options), key="mid_match")]
     current = results[mk]["dota_match_id"] or ""
-    new = st.text_input("Dota Match ID (не ID лобі). Порожнє поле прибирає ID.", value=current,
-                        key="mid_val_%s_%s" % (mk, current))
+    new = st.text_input("Dota Match ID (не ID лобі). Порожнє поле прибирає ID.", value=current, key="mid_val_%s_%s" % (mk, current))
     if st.button("Зберегти Match ID", key="mid_save_" + mk):
         new = new.strip()
         if new and not new.isdigit():
@@ -339,7 +316,6 @@ def match_id_admin():
 SS_COLS = [("Команда", "team"), ("Гравець", "name"), ("Герой", "hero_name"), ("K", "kills"), ("D", "deaths"),
            ("A", "assists"), ("LH", "last_hits"), ("DN", "denies"), ("GPM", "gold_per_min"),
            ("XPM", "xp_per_min"), ("Шкода героям", "hero_damage"), ("Шкода вежам", "tower_damage")]
-SS_NUM = [k for _, k in SS_COLS[3:]]
 
 
 def stats_to_df(data):
@@ -371,33 +347,26 @@ def _opt_int(text):
     return int(text) if text.isdigit() else None
 
 
-def screenshot_admin():
+def render_screenshot_stats_form(mk, key_prefix="ss"):
     teams, started, bo, results, slots = load_state()
-    st.subheader("📷 Статистика зі скріншота")
-    played = [s for s in slots.values() if s["result"]] if started else []
-    if not played:
-        st.info("Спочатку внесіть результат матчу (сторінка «Турнірна таблиця»).")
-        return
-    options = {"%s: %s vs %s" % (s["key"], s["a"], s["b"]): s["key"] for s in played}
-    mk = options[st.selectbox("Матч", list(options), key="ss_match")]
     slot = slots[mk]
-    games_played = max(1, slot["result"]["score_a"] + slot["result"]["score_b"])
-    game = st.selectbox("Гра №", list(range(1, games_played + 1)), key="ss_game_" + mk)
+    games_played = max(1, slot["result"]["score_a"] + slot["result"]["score_b"]) if slot.get("result") else 1
+    game = st.selectbox("Гра №", list(range(1, games_played + 1)), key=f"{key_prefix}_ss_game_{mk}")
     saved = storage.get_match_stats().get(mk, {}).get(game)
-    base = "%s_%d" % (mk, game)
+    base = f"{key_prefix}_{mk}_{game}"
 
     key_g, model_g = secret("gemini_api_key", "GEMINI_API_KEY"), secret("gemini_model", "GEMINI_MODEL")
     openrouter_key = secret("openrouter_api_key", "OPENROUTER_API_KEY")
     openrouter_model = secret("openrouter_model", "OPENROUTER_MODEL") or "google/gemini-2.5-flash"
     host_o, model_o = secret("ollama_host", "OLLAMA_HOST"), secret("ollama_vision_model", "OLLAMA_VISION_MODEL")
     if not screenshot_ai.configured(key_g, model_o, openrouter_key):
-        st.info("AI для скріншотів не налаштований (додайте gemini_api_key або openrouter_api_key у Secrets), "
-                "але таблицю можна заповнити вручну.")
+        st.info("AI для скріншотів не налаштований (додайте gemini_api_key або openrouter_api_key у Secrets), але таблицю можна заповнити вручну.")
+
     files = st.file_uploader("Скріншот(и) кінця матчу: PNG, JPG або WEBP (до %d файлів)" % screenshot_ai.MAX_IMAGES,
-                             type=["png", "jpg", "jpeg", "webp"], accept_multiple_files=True,
-                             key="ssf_" + base)
+                            type=["png", "jpg", "jpeg", "webp"], accept_multiple_files=True,
+                            key=f"{key_prefix}_ssf_{base}")
     c1, c2, _ = st.columns([1, 1, 2])
-    if c1.button("🔍 Розпізнати", type="primary", key="ssgo_" + base,
+    if c1.button("🔍 Розпізнати", type="primary", key=f"{key_prefix}_ssgo_{base}",
                  disabled=not files or not screenshot_ai.configured(key_g, model_o, openrouter_key)):
         try:
             with st.spinner("AI читає таблицю зі скріншота..."):
@@ -407,46 +376,43 @@ def screenshot_admin():
                                               openrouter_key=openrouter_key,
                                               openrouter_model=openrouter_model)
             st.session_state["ssd_" + base] = draft
-            st.session_state["ssv_" + base] = st.session_state.get("ssv_" + base, 0) + 1
+            st.session_state[f"{key_prefix}_ssv_{base}"] = st.session_state.get(f"{key_prefix}_ssv_{base}", 0) + 1
         except screenshot_ai.VisionError as e:
             st.error(str(e))
-    if c2.button("✍️ Заповнити вручну", key="ssm_" + base):
+    if c2.button("✍️ Заповнити вручну", key=f"{key_prefix}_ssm_{base}"):
         st.session_state["ssd_" + base] = screenshot_ai.empty_template()
-        st.session_state["ssv_" + base] = st.session_state.get("ssv_" + base, 0) + 1
+        st.session_state[f"{key_prefix}_ssv_{base}"] = st.session_state.get(f"{key_prefix}_ssv_{base}", 0) + 1
 
     draft = st.session_state.get("ssd_" + base)
     data = draft or saved
     if not data:
         st.caption("Завантажте скріншот і натисніть «Розпізнати» або заповніть таблицю вручну.")
         return
-    ver = st.session_state.get("ssv_" + base, 0)
+    ver = st.session_state.get(f"{key_prefix}_ssv_{base}", 0)
     if draft:
-        st.warning("Це чернетка від AI. Обов'язково перевірте цифри, бо AI може помилитися, "
-                   "і лише потім зберігайте.")
+        st.warning("Це чернетка від AI. Обов'язково перевірте цифри, бо AI може помилитися, і лише потім зберігайте.")
     else:
         st.caption("Збережена статистика цієї гри. Можна виправити й зберегти знову.")
 
-    k = "ssw_%s_%d_" % (base, ver)
+    k = f"{key_prefix}_ssw_{base}_{ver}_"
     m1, m2, m3, m4 = st.columns(4)
     win_opts = ["не вказано", "Radiant", "Dire"]
     win_idx = {True: 1, False: 2}.get(data.get("radiant_win"), 0)
     winner = m1.selectbox("Переміг", win_opts, index=win_idx, key=k + "win")
     duration = m2.text_input("Тривалість (хв:сек)", value=data.get("duration") or "", key=k + "dur")
-    r_score = m3.text_input("Вбивства Radiant", value="" if data.get("radiant_score") is None
-                            else str(data["radiant_score"]), key=k + "rs")
-    d_score = m4.text_input("Вбивства Dire", value="" if data.get("dire_score") is None
-                            else str(data["dire_score"]), key=k + "ds")
+    r_score = m3.text_input("Вбивства Radiant", value="" if data.get("radiant_score") is None else str(data["radiant_score"]), key=k + "rs")
+    d_score = m4.text_input("Вбивства Dire", value="" if data.get("dire_score") is None else str(data["dire_score"]), key=k + "ds")
+
     team_opts = ["не вказано", slot["a"], slot["b"]]
     team_idx = team_opts.index(data["radiant_team"]) if data.get("radiant_team") in team_opts else 0
     radiant_team = st.selectbox("Radiant: це команда", team_opts, index=team_idx, key=k + "rt")
 
     cfg = {"Команда": st.column_config.SelectboxColumn("Команда", options=["Radiant", "Dire"], required=True)}
     cfg.update({label: st.column_config.NumberColumn(label, format="%d", step=1) for label, _ in SS_COLS[3:]})
-    edited = st.data_editor(stats_to_df(data), column_config=cfg, num_rows="dynamic",
-                            hide_index=True, key=k + "ed")
+    edited = st.data_editor(stats_to_df(data), column_config=cfg, num_rows="dynamic", hide_index=True, key=k + "ed")
 
     b1, b2, _ = st.columns([1, 1, 2])
-    if b1.button("💾 Зберегти статистику", type="primary", key="sssave_" + base):
+    if b1.button("💾 Зберегти статистику", type="primary", key=f"{key_prefix}_sssave_{base}"):
         players = df_to_players(edited)
         if not players:
             st.error("Таблиця порожня.")
@@ -455,27 +421,39 @@ def screenshot_admin():
             storage.save_match_stats(mk, game, {
                 "radiant_win": {"Radiant": True, "Dire": False}.get(winner),
                 "duration": duration.strip() or None,
-                "radiant_score": _opt_int(r_score), "dire_score": _opt_int(d_score),
-                "radiant_team": radiant_team if other else None, "dire_team": other,
-                "players": players})
+                "radiant_score": _opt_int(r_score),
+                "dire_score": _opt_int(d_score),
+                "radiant_team": radiant_team if other else None,
+                "dire_team": other,
+                "players": players,
+            })
             st.session_state.pop("ssd_" + base, None)
             flash("Статистику матчу %s (гра %d) збережено." % (mk, game))
             st.rerun()
-    if saved and b2.button("🗑 Видалити збережену", key="ssdel_" + base):
+    if saved and b2.button("🗑 Видалити збережену", key=f"{key_prefix}_ssdel_{base}"):
         storage.delete_match_stats(mk, game)
         st.session_state.pop("ssd_" + base, None)
         flash("Статистику матчу %s (гра %d) видалено." % (mk, game), "warning")
         st.rerun()
 
 
-# =============================================================== СТОРІНКИ
+def screenshot_admin():
+    teams, started, bo, results, slots = load_state()
+    st.subheader("📷 Статистика зі скріншота")
+    played = [s for s in slots.values() if s["result"]] if started else []
+    if not played:
+        st.info("Спочатку внесіть результат матчу (сторінка «Турнірна таблиця»).")
+        return
+    options = {"%s: %s vs %s" % (s["key"], s["a"], s["b"]): s["key"] for s in played}
+    mk = options[st.selectbox("Матч", list(options), key="admin_ss_match")]
+    render_screenshot_stats_form(mk, key_prefix="admin")
+
+
 def welcome_page():
     teams, started, bo, results, slots = load_state()
-    st.markdown(home_html.welcome_html(teams, started, bo, slots, EVENT_DATE, EVENT_PLACE, STREAM_URL),
-                unsafe_allow_html=True)
+    st.markdown(home_html.welcome_html(teams, started, bo, slots, EVENT_DATE, EVENT_PLACE, STREAM_URL), unsafe_allow_html=True)
     st.write("")
-    st.info("Учасникам: перед грою ввімкніть у Dota 2 «Журнал матчів доступний усім» "
-            "(Налаштування → Спільнота → Параметри), інакше статистика матчу не з'явиться.")
+    st.info("Учасникам: перед грою ввімкніть у Dota 2 «Журнал матчів доступний усім» (Налаштування → Спільнота → Параметри), інакше статистика матчу не з'явиться.")
     b1, b2, _ = st.columns([1, 1, 3])
     b1.page_link(PAGE_TABLE, label="Турнірна таблиця", icon="🏆")
     b2.page_link(PAGE_GAMES, label="Ігри та аналіз", icon="📊")
@@ -506,8 +484,7 @@ def games_page():
             st.info("Результатів ще немає.")
         for s in played:
             r = s["result"]
-            title = "%s · %s  %d:%d  %s  →  %s" % (
-                s["key"], s["a"], r["score_a"], r["score_b"], s["b"], r["winner"])
+            title = "%s · %s  %d:%d  %s  →  %s" % (s["key"], s["a"], r["score_a"], r["score_b"], s["b"], r["winner"])
             with st.expander(title):
                 mid = r["dota_match_id"]
                 if shots.get(s["key"]):
@@ -543,7 +520,6 @@ def games_page():
 
 
 def admin_page():
-    """Прихована сторінка входу: адреса /cibybybyznik, у меню її немає."""
     page_header("Лише для організаторів", "🔐 Вхід організатора")
     if st.session_state.get("is_admin", False):
         st.success("Ви вже в режимі організатора.")
@@ -554,8 +530,7 @@ def admin_page():
         return
     password = admin_password()
     if not password:
-        st.warning("Пароль організатора не задано. Додайте admin_password у Secrets "
-                   "(або змінну TOURNAMENT_ADMIN_PASSWORD).")
+        st.warning("Пароль організатора не задано. Додайте admin_password у Secrets (або змінну TOURNAMENT_ADMIN_PASSWORD).")
         return
     with st.form("login"):
         entered = st.text_input("Пароль", type="password")
@@ -563,37 +538,30 @@ def admin_page():
     if submitted:
         if hmac.compare_digest(entered.encode("utf-8"), password.encode("utf-8")):
             st.session_state["is_admin"] = True
-            st.switch_page(PAGE_WELCOME)  # після входу повертаємо на головну
+            st.switch_page(PAGE_WELCOME)
         else:
-            time.sleep(1)  # уповільнює підбір пароля
+            time.sleep(1)
             st.error("Неправильний пароль.")
 
 
-# ---------------------------------------------------------------- навігація
 PAGE_WELCOME = st.Page(welcome_page, title="Привітання", icon="🏠", url_path="welcome", default=True)
 PAGE_TABLE = st.Page(table_page, title="Турнірна таблиця", icon="🏆", url_path="bracket")
 PAGE_GAMES = st.Page(games_page, title="Ігри та аналіз", icon="📊", url_path="games")
 PAGE_ADMIN = st.Page(admin_page, title="Вхід організатора", icon="🔐", url_path="cibybybyznik")
-# position="hidden": стандартне меню не показується, свої посилання нижче (без сторінки входу)
 pg = st.navigation([PAGE_WELCOME, PAGE_TABLE, PAGE_GAMES, PAGE_ADMIN], position="hidden")
 
-# ---------------------------------------------------------------- бічна панель
 is_admin = st.session_state.get("is_admin", False)
 
 with st.sidebar:
-    st.markdown('<div class="brand"><div class="lg">🏆</div><div><b>Dota 2 · ФТІ КПІ</b>'
-                '<span>Турнірна система</span></div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="brand"><div class="lg">🏆</div><div><b>Dota 2 · ФТІ КПІ</b><span>Турнірна система</span></div></div>', unsafe_allow_html=True)
     st.page_link(PAGE_WELCOME, label="Привітання", icon="🏠")
     st.page_link(PAGE_TABLE, label="Турнірна таблиця", icon="🏆")
     st.page_link(PAGE_GAMES, label="Ігри та аналіз", icon="📊")
 
     if STREAM_URL:
-        st.markdown('<a class="stream-btn" href="%s" target="_blank" '
-                    'rel="noopener noreferrer">📺 Дивитись стрім</a>' % html.escape(STREAM_URL, quote=True),
-                    unsafe_allow_html=True)
+        st.markdown('<a class="stream-btn" href="%s" target="_blank" rel="noopener noreferrer">📺 Дивитись стрім</a>' % html.escape(STREAM_URL, quote=True), unsafe_allow_html=True)
     else:
-        st.markdown('<span class="stream-btn off">📺 Стрім скоро буде</span>',
-                    unsafe_allow_html=True)
+        st.markdown('<span class="stream-btn off">📺 Стрім скоро буде</span>', unsafe_allow_html=True)
 
     if is_admin:
         st.divider()
@@ -603,9 +571,7 @@ with st.sidebar:
             st.rerun()
         teams = storage.get_teams()
         if not storage.is_started():
-            st.caption("Додайте %s команд. Порядок додавання = номер у сітці. "
-                       "При 12 і 14 командах перші в списку отримують bye "
-                       "(одразу у другий раунд верхньої сітки)." % T.sizes_text())
+            st.caption("Додайте %s команд. Порядок додавання = номер у сітці. При 12 і 14 командах перші в списку отримують bye (одразу у другий раунд верхньої сітки)." % T.sizes_text())
             with st.form("add_team", clear_on_submit=True):
                 new_name = st.text_input("Назва команди")
                 if st.form_submit_button("Додати команду"):
@@ -619,8 +585,7 @@ with st.sidebar:
                     storage.remove_team(name)
                     st.rerun()
             bo_choice = st.selectbox("Формат матчів", T.VALID_BO, format_func=lambda x: "BO%d" % x)
-            if st.button("Запустити турнір", type="primary",
-                        disabled=len(teams) not in T.VALID_SIZES):
+            if st.button("Запустити турнір", type="primary", disabled=len(teams) not in T.VALID_SIZES):
                 err = storage.start_tournament(bo_choice)
                 flash(err or "Турнір запущено.", "error" if err else "success")
                 st.rerun()
