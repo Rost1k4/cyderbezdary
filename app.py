@@ -284,7 +284,8 @@ def results_admin():
         score_a = c1.number_input("Рахунок: %s" % s["a"], 0, need, 0, key="sa_" + key)
         score_b = c2.number_input("Рахунок: %s" % s["b"], 0, need, 0, key="sb_" + key)
         winner_op = st.selectbox("Переміг", [s["a"], s["b"]], index=0, key="winner_" + key)
-        dota_id = st.text_input("Dota Match ID",
+        st.caption("Важливо: для скріншоту переможець — команда з зеленою позначкою/блоком, навіть якщо цифри на картці не збігаються з рахунком.")
+        dota_id = st.text_input("Dota Match ID, не ID лобі (необов'язково, для аналізу)",
                                 key="did_" + key)
         confirmed = st.checkbox("Підтверджую, що результат остаточний", key="cf_" + key)
         if st.button("Зберегти результат", type="primary", disabled=not confirmed):
@@ -556,6 +557,7 @@ def render_screenshot_stats_form(mk, key_prefix="ss"):
     else:
         st.caption("Збережена статистика цієї гри. Можна виправити й зберегти знову.")
 
+    st.caption("Важливо: для скріншоту переможець — команда з зеленою позначкою, навіть якщо кількість очок або рівень рахунку не збігається з найкрупнішим числом.")
     k = f"{key_prefix}_ssw_{base}_{ver}_"
     m1, m2, m3, m4 = st.columns(4)
     win_opts = ["не вказано", "Radiant", "Dire"]
@@ -631,6 +633,8 @@ def welcome_page():
     st.markdown(home_html.welcome_html(teams, started, bo, slots, EVENT_DATE, EVENT_PLACE, STREAM_URL),
                 unsafe_allow_html=True)
     st.write("")
+    st.info("Учасникам: перед грою ввімкніть у Dota 2 «Журнал матчів доступний усім» "
+            "(Налаштування → Спільнота → Параметри), інакше статистика матчу не з'явиться.")
     b1, b2, _ = st.columns([1, 1, 3])
     b1.page_link(PAGE_TABLE, label="Турнірна таблиця", icon="🏆")
     b2.page_link(PAGE_GAMES, label="Ігри та аналіз", icon="📊")
@@ -665,14 +669,29 @@ def games_page():
                 s["key"], s["a"], r["score_a"], r["score_b"], s["b"], r["winner"])
             with st.expander(title):
                 mid = r["dota_match_id"]
-                if shots.get(s["key"]):
-                    st.markdown(screenshot_stats_html(shots[s["key"]], full=True), unsafe_allow_html=True)
+                saved_games = shots.get(s["key"], {})
+                if saved_games:
+                    st.markdown(screenshot_stats_html(saved_games, full=True), unsafe_allow_html=True)
+                    # Screenshot-derived stats must have their own AI analysis, even when there is no OpenDota ID.
+                    for game_no, game_stats in sorted(saved_games.items()):
+                        review_key = "screenshot_ai_review_%s_%s" % (s["key"], game_no)
+                        if st.button("🤖 Опис від ШІ — гра %s" % game_no, key="btn_" + review_key):
+                            try:
+                                with st.spinner("ШІ шукає найцікавіші історії в статистиці матчу..."):
+                                    st.session_state[review_key] = ai_review.screenshot_review(
+                                        game_stats, "%s: %s vs %s, гра %s" % (s["key"], s["a"], s["b"], game_no),
+                                        api_key=secret("gemini_api_key", "GEMINI_API_KEY"),
+                                        model=secret("gemini_model", "GEMINI_MODEL"))
+                            except ai_review.AIError as e:
+                                st.error(str(e))
+                        if st.session_state.get(review_key):
+                            st.markdown(st.session_state[review_key])
                 if not mid:
-                    if not shots.get(s["key"]):
+                    if not saved_games:
                         st.caption("Статистику цього матчу ще не додано.")
                     continue
                 st.caption("Dota Match ID: %s" % mid)
-                if st.toggle("Показати аналіз", key="tg_" + s["key"]):
+                if st.toggle("Показати аналіз з OpenDota", key="tg_" + s["key"]):
                     render_match_analysis(int(mid), "log_" + s["key"])
 
     if st.session_state.get("is_admin", False):
@@ -684,7 +703,7 @@ def games_page():
     st.divider()
     st.subheader("Статистика за Match ID")
     with st.form("match_form"):
-        match_id = st.text_input("Match ID завершеного матчу")
+        match_id = st.text_input("Match ID завершеного матчу (не ID лобі)")
         submitted = st.form_submit_button("Показати статистику", type="primary")
     if submitted:
         if not match_id.strip().isdigit():

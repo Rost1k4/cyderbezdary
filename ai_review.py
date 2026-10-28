@@ -296,8 +296,8 @@ def _post_adaptive(model: str, key: str, body: dict, fast: bool):
 
 
 def _ask(system: str, user: str, max_tokens: int, temperature: float = 0.3,
-         fast: bool = True) -> str:
-    key = config.api_key()
+         fast: bool = True, api_key_override: str = None, model_override: str = None) -> str:
+    key = (api_key_override or "").strip() or config.api_key()
     if not key:
         raise AIError(
             "Не задано ключ Gemini. Створіть його на https://aistudio.google.com/apikey "
@@ -309,7 +309,7 @@ def _ask(system: str, user: str, max_tokens: int, temperature: float = 0.3,
         # тому max_tokens беремо з запасом; довжину відповіді тримає промпт.
         "generationConfig": {"maxOutputTokens": max_tokens, "temperature": temperature},
     }
-    models = [config.model()]
+    models = [((model_override or "").strip() or config.model())]
     models += [m for m in config.fallback_models() if m not in models]
 
     first_error = None
@@ -352,6 +352,37 @@ def short_review(match: dict, heroes: dict) -> str:
     """Мега-коротка оцінка для сайту. Кидає AIError з готовим текстом."""
     return _tidy_short(_ask(SHORT_PROMPT, _prepare(match, heroes, brief=True), max_tokens=2048))
 
+
+
+SCREENSHOT_REVIEW_PROMPT = """Ти — креативний, дотепний, але компетентний аналітик Dota 2 на студентському турнірі.
+Тобі дають статистику з таблиці матчу, розпізнану зі скриншота. Напиши живий, оригінальний розбір українською — не дотримуйся фіксованого шаблону чи обов'язкових розділів. Сам обери найцікавіші кути аналізу: хто був двигуном команди, хто створював простір, незвичні цифри, контраст між K/D/A та фармом, можливий MVP, командна синергія, що могло вирішити гру, мемний але доброзичливий титул для гравця або коротка історія матчу. Можеш використовувати образні порівняння та гумор, але без образ і приниження.
+
+Спирайся ТІЛЬКИ на передані дані. Не вигадуй події, таймінги, предмети, переможця чи причини, яких не видно зі статистики. Якщо даних мало, чесно зазнач це й аналізуй лише те, що видно. Відрізняй кількість убивств від переможця матчу. Пиши зрозуміло, не надто довго, з Markdown-форматуванням. Не повторюй усю таблицю цифр — витягуй цікаві висновки."""
+
+def screenshot_review(stats: dict, match_label: str = "Матч", api_key: str = None,
+                      model: str = None) -> str:
+    """Креативний AI-розбір збереженої статистики, навіть без OpenDota Match ID."""
+    import json
+
+    if not isinstance(stats, dict):
+        raise AIError("Не вдалося прочитати статистику цього матчу.")
+    players = stats.get("players") or []
+    if not players:
+        raise AIError("У збереженій статистиці немає гравців для аналізу.")
+    payload = {
+        "матч": match_label,
+        "переможець": (stats.get("radiant_team") if stats.get("radiant_win") is True else
+                       stats.get("dire_team") if stats.get("radiant_win") is False else "не визначено"),
+        "сторона Radiant": stats.get("radiant_team") or "невідомо",
+        "сторона Dire": stats.get("dire_team") or "невідомо",
+        "тривалість": stats.get("duration") or "невідомо",
+        "убивства Radiant": stats.get("radiant_score"),
+        "убивства Dire": stats.get("dire_score"),
+        "гравці": players,
+    }
+    return _tidy_short(_ask(SCREENSHOT_REVIEW_PROMPT, json.dumps(payload, ensure_ascii=False, indent=2, default=str),
+                            max_tokens=2500, temperature=0.85, fast=False,
+                            api_key_override=api_key, model_override=model))
 
 def review_match(match: dict, heroes: dict) -> None:
     """Повна оцінка для консолі (cli.py)."""

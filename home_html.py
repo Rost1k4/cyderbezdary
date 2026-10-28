@@ -50,7 +50,10 @@ CSS = """<style>
 .path.wb{--c:#4F8CFF}.path.lb{--c:#C45CFF}.path.gf{--c:#FFD166}
 .bento{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:20px}
 .tile{background:#1C1745;border:1px solid #3A3180;border-radius:18px;padding:22px;transition:transform .2s,border-color .2s,box-shadow .2s}
-.tile:hover{transform:translateY(-3px);border-color:#8B6CFF;box-shadow:0 14px 34px rgba(139,108,255,.18)}
+.tile-link{display:block;color:inherit;text-decoration:none!important;position:relative;cursor:pointer}
+.tile-link:hover{transform:translateY(-3px);border-color:#8B6CFF;box-shadow:0 14px 34px rgba(139,108,255,.18);color:inherit}
+.tile-cta{display:inline-block;margin-top:14px;color:#A99AFF;font-weight:700;font-size:.82rem}
+.tile-disabled{opacity:.72;cursor:default}.tile-disabled:hover{transform:none;border-color:#3A3180;box-shadow:none}
 .tile h3{font-family:"Onest",system-ui,sans-serif!important;font-weight:700;font-size:1.02rem;margin:0 0 6px;padding:0}.tile p{color:#9A93D1;font-size:.9rem;margin:0}
 .live{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:rgba(255,159,67,.14);color:#FF9F43;border:1px solid #FF9F43;border-radius:999px;padding:4px 13px;font-weight:700;font-size:.78rem;letter-spacing:.1em}
 .live i{width:8px;height:8px;border-radius:50%;background:#FF9F43;animation:ping 1.6s infinite}
@@ -142,12 +145,20 @@ def welcome_html(teams, started, bo, slots, event_date, event_place, stream_url)
         '<div class="path gf"><div class="n">03</div><h3>Grand Final</h3><p>Переможці верхньої та нижньої сіток зустрічаються в одному вирішальному матчі.</p></div></div>')
     live = ('<span class="live"><i></i>LIVE</span>' if stream_url
             else '<span class="live off"><i></i>СКОРО</span>')
+    # Tiles are real links, not decorative cards. Stream remains disabled until STREAM_URL is set.
+    stream_tile = (
+        '<a class="tile tile-link" href="%s" target="_blank" rel="noopener noreferrer">'
+        '<h3>📺 Трансляція</h3><p>Дивись найцікавіші матчі наживо.</p>%s</a>' % (_e(stream_url), live)
+        if stream_url else
+        '<div class="tile tile-link tile-disabled" aria-disabled="true" title="Посилання на стрім додамо пізніше">'
+        '<h3>📺 Трансляція</h3><p>Посилання на стрім додамо пізніше.</p>%s</div>' % live
+    )
     bento = (
         '<div class="sh"><div class="tag">Що на тебе чекає</div>'
         '<h2>Дивись і грай з <span class="grad">усіма даними</span></h2></div>'
         '<div class="bento">'
-        '<div class="tile"><h3>🏆 Жива сітка</h3><p>Хто з ким грає, хто пройшов далі і хто вибув, оновлюється сама.</p></div>'
-        '<div class="tile"><h3>📊 Статистика матчу</h3><p>K/D/A, GPM, шкода: натисни на завершений матч у сітці.</p></div>'
-        '<div class="tile"><h3>🤖 AI-розбір</h3><p>Коротко про перебіг гри, переломний момент і MVP.</p></div>'
-        '<div class="tile"><h3>📺 Трансляція</h3><p>Найцікавіші матчі в прямому ефірі.</p>%s</div></div>' % live)
+        '<a class="tile tile-link" href="/bracket"><h3>🏆 Турнірна таблиця</h3><p>Відкрий сітку, результати матчів і місця команд.</p><span class="tile-cta">Відкрити таблицю ↗</span></a>'
+        '<a class="tile tile-link" href="/games"><h3>📊 Таблиця статистики</h3><p>K/D/A, GPM, шкода та інші показники гравців.</p><span class="tile-cta">Перейти до таблиць ↗</span></a>'
+        '<a class="tile tile-link" href="/games"><h3>🤖 Аналіз від ШІ</h3><p>Незвичайні висновки, MVP, поворотні моменти й історія матчу.</p><span class="tile-cta">Читати аналіз ↗</span></a>'
+        + stream_tile + '</div>')
     return banner + hero + ticker + facts_html(teams, started, bo, slots) + steps + bento
