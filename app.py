@@ -548,6 +548,31 @@ def render_screenshot_stats_form(mk, key_prefix="ss"):
         st.rerun()
 
 
+def screenshot_admin():
+    """Адмінський блок для додавання/редагування статистики зі скріншотів завершених матчів."""
+    teams, started, bo, results, slots = load_state()
+    st.subheader("📷 Статистика зі скріншота")
+    if not started:
+        st.info("Спочатку запустіть турнір.")
+        return
+
+    played = [key for key, slot in slots.items() if slot.get("result")]
+    if not played:
+        st.info("Ще немає завершених матчів, для яких можна додати статистику зі скріншота.")
+        return
+
+    labels = {
+        "%s: %s vs %s" % (key, slots[key]["a"], slots[key]["b"]): key
+        for key in played
+    }
+    chosen_label = st.selectbox(
+        "Матч для додавання або редагування статистики",
+        list(labels),
+        key="screenshot_admin_match",
+    )
+    render_screenshot_stats_form(labels[chosen_label], key_prefix="admin_ss")
+
+
 # =============================================================== СТОРІНКИ
 def welcome_page():
     teams, started, bo, results, slots = load_state()
