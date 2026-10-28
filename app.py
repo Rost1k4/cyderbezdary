@@ -284,7 +284,6 @@ def results_admin():
         score_a = c1.number_input("Рахунок: %s" % s["a"], 0, need, 0, key="sa_" + key)
         score_b = c2.number_input("Рахунок: %s" % s["b"], 0, need, 0, key="sb_" + key)
         winner_op = st.selectbox("Переміг", [s["a"], s["b"]], index=0, key="winner_" + key)
-        st.caption("Важливо: для скріншоту переможець — команда з зеленою позначкою/блоком, навіть якщо цифри на картці не збігаються з рахунком.")
         dota_id = st.text_input("Dota Match ID",
                                 key="did_" + key)
         confirmed = st.checkbox("Підтверджую, що результат остаточний", key="cf_" + key)
@@ -557,7 +556,6 @@ def render_screenshot_stats_form(mk, key_prefix="ss"):
     else:
         st.caption("Збережена статистика цієї гри. Можна виправити й зберегти знову.")
 
-    st.caption("Важливо: для скріншоту переможець — команда з зеленою позначкою, навіть якщо кількість очок або рівень рахунку не збігається з найкрупнішим числом.")
     k = f"{key_prefix}_ssw_{base}_{ver}_"
     m1, m2, m3, m4 = st.columns(4)
     win_opts = ["не вказано", "Radiant", "Dire"]
@@ -686,7 +684,7 @@ def games_page():
     st.divider()
     st.subheader("Статистика за Match ID")
     with st.form("match_form"):
-        match_id = st.text_input("Match ID завершеного матчу (не ID лобі)")
+        match_id = st.text_input("Match ID завершеного матчу")
         submitted = st.form_submit_button("Показати статистику", type="primary")
     if submitted:
         if not match_id.strip().isdigit():
