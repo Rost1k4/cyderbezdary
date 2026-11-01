@@ -47,9 +47,7 @@ details.m[open]>summary .hd{background:#8B6CFF;color:#fff}
 </style>"""
 
 STATUS_TEXT = {"waiting": "Очікує", "ready": "Готовий до гри", "done": "Завершено ▾"}
-SECTION_TITLES = {"WB": "Верхня сітка (Winners Bracket)",
-                  "LB": "Нижня сітка (Losers Bracket)",
-                  "GF": "Grand Final"}
+SECTION_TITLES = {"WB": "Турнірна сітка"}
 
 
 # ------------------------------------------------------ статистика матчу
