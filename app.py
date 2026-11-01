@@ -699,20 +699,22 @@ def games_page():
         st.divider()
         screenshot_admin()
 
-    st.divider()
-    st.subheader("Статистика за Match ID")
-    with st.form("match_form"):
-        match_id = st.text_input("Match ID завершеного матчу (не ID лобі)")
-        submitted = st.form_submit_button("Показати статистику", type="primary")
-    if submitted:
-        if not match_id.strip().isdigit():
-            st.session_state.pop("viewed_match", None)
-            st.error("Match ID має складатися лише з цифр.")
-        else:
-            st.session_state["viewed_match"] = int(match_id)
-    mid = st.session_state.get("viewed_match")
-    if mid is not None:
-        render_match_analysis(mid, "free")
+    # Тимчасово вимкнено: секція «Статистика за Match ID» (ручний пошук матчу).
+    # Щоб повернути — прибери '# ' на початку рядків нижче.
+    # st.divider()
+    # st.subheader("Статистика за Match ID")
+    # with st.form("match_form"):
+    #     match_id = st.text_input("Match ID завершеного матчу (не ID лобі)")
+    #     submitted = st.form_submit_button("Показати статистику", type="primary")
+    # if submitted:
+    #     if not match_id.strip().isdigit():
+    #         st.session_state.pop("viewed_match", None)
+    #         st.error("Match ID має складатися лише з цифр.")
+    #     else:
+    #         st.session_state["viewed_match"] = int(match_id)
+    # mid = st.session_state.get("viewed_match")
+    # if mid is not None:
+    #     render_match_analysis(mid, "free")
 
 
 def admin_page():
