@@ -29,7 +29,7 @@ REFRESH_SECONDS = 10
 
 # ---- Налаштуй під себе ----
 EVENT_NAME = "Турнір з Dota 2"
-EVENT_DATE = "Дата уточнюється"
+EVENT_DATE = "07.11-08.11"
 EVENT_PLACE = "ФТІ КПІ ім. Ігоря Сікорського"
 STREAM_URL = ""  # встав посилання на стрім, напр. "https://www.twitch.tv/..."
 
