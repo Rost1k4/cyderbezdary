@@ -75,7 +75,7 @@ def stage_html(started, slots):
         cards = [
             _mini("c1", "W1", "Завершено", [("w", "Команда A", 2), ("l", "Команда B", 1)]),
             _mini("c2", "W2", "Готовий до гри", [("", "Команда C", ""), ("", "Команда D", "")]),
-            _mini("c3", "GF", "Очікує", [("d", "Переможець W3", ""), ("d", "Переможець L2", "")]),
+            _mini("c3", "W3", "Очікує", [("d", "Переможець W1", ""), ("d", "Переможець W2", "")]),
         ]
         caption = "Приклад карток матчів"
     else:
@@ -90,9 +90,9 @@ def stage_html(started, slots):
         if ready:
             s = ready[0]
             cards.append(_mini("c2", s["key"], "Готовий до гри", [("", s["a"], ""), ("", s["b"], "")]))
-        gf = slots["GF"]
+        gf = T.final_slot(slots)
         gf_rows = [("" if gf[k] else "d", gf[k] or gf[k + "_label"], "") for k in ("a", "b")]
-        cards.append(_mini("c3", "GF", "Grand Final" if gf["status"] != "done" else "Завершено", gf_rows))
+        cards.append(_mini("c3", gf["key"], "Фінал" if gf["status"] != "done" else "Завершено", gf_rows))
         caption = "Актуальні матчі турніру"
     return '<div class="stage">%s<div class="cap">%s</div></div>' % ("".join(cards), caption)
 
@@ -106,7 +106,7 @@ def facts_html(teams, started, bo, slots):
                  ("%d / %d" % (played, len(slots)), "матчів зіграно"), (status, "статус турніру")]
     else:
         items = [(n or "4–16", "команд зареєстровано" if n else "команд на турнірі"),
-                 ("BO1·3·5", "формат матчів"), ("2 життя", "вибуваєш після двох поразок"),
+                 ("BO1·3·5", "формат матчів"), ("1 життя", "вибуваєш після поразки"),
                  ("Реєстрація" if n else "Скоро", "статус турніру")]
     return '<div class="facts">%s</div>' % "".join(
         '<div class="fact"><b>%s</b><span>%s</span></div>' % (_e(v), _e(l)) for v, l in items)
@@ -121,11 +121,10 @@ def welcome_html(teams, started, bo, slots, event_date, event_place, stream_url)
         '<h1 class="hh">Турнір з <em>Dota&nbsp;2</em></h1>'
         '<p>Вітаємо на турнірі з Dota 2! Слідкуйте за сіткою, результатами та детальним аналізом '
         'кожної гри в реальному часі.</p>'
-        '<div class="chips"><span class="chip b">Верхня сітка</span><span class="chip p">Нижня сітка</span>'
-        '<span class="chip g">Grand Final</span></div>'
+        '<div class="chips"><span class="chip b">Плей-оф</span><span class="chip g">Фінал</span></div>'
         '<div class="meta"><span>📅 %s</span><span>📍 %s</span></div></div>%s</div>'
         % (_e(event_date), _e(event_place), stage_html(started, slots)))
-    words = ["DOUBLE ELIMINATION", "BO1 · BO3 · BO5", "ЖИВА СІТКА", "СТАТИСТИКА МАТЧІВ", "AI-РОЗБІР", "ТРАНСЛЯЦІЯ"]
+    words = ["SINGLE ELIMINATION", "BO1 · BO3 · BO5", "ЖИВА СІТКА", "СТАТИСТИКА МАТЧІВ", "AI-РОЗБІР", "ТРАНСЛЯЦІЯ"]
     run = "<span>◆</span>".join("<b>%s</b>" % w for w in words) + "<span>◆</span>"
     ticker = '<div class="ticker"><div>%s%s</div></div>' % (run, run)
     live = ('<span class="live"><i></i>LIVE</span>' if stream_url
