@@ -778,7 +778,7 @@ with st.sidebar:
         if not storage.is_started():
             st.caption("Додайте %s команд. Порядок додавання = номер у сітці. "
                        "При 12 і 14 командах перші в списку отримують bye "
-                       "(одразу у другий раунд верхньої сітки)." % T.sizes_text())
+                       "(одразу у другий раунд)." % T.sizes_text())
             with st.form("add_team", clear_on_submit=True):
                 new_name = st.text_input("Назва команди")
                 if st.form_submit_button("Додати команду"):
