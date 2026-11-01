@@ -41,13 +41,6 @@ CSS = """<style>
 .sh{margin:46px 0 6px}.sh .tag{color:#8B6CFF;font-weight:700;letter-spacing:.16em;font-size:.74rem;text-transform:uppercase}
 .sh h2{font-size:clamp(1.4rem,3vw,2.1rem);margin:8px 0 8px;padding:0}.sh p{color:#9A93D1;max-width:620px;margin:0}
 .grad{background:linear-gradient(90deg,#4F8CFF,#C45CFF 55%,#FFD166);-webkit-background-clip:text;background-clip:text;color:transparent}
-.paths{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:20px}
-.path{position:relative;background:#1C1745;border:1px solid #3A3180;border-radius:18px;padding:24px 22px;overflow:hidden;transition:transform .2s,border-color .2s}
-.path:hover{transform:translateY(-3px);border-color:var(--c)}
-.path::before{content:"";position:absolute;inset:0;background:radial-gradient(240px 160px at 0 0,var(--c),transparent 70%);opacity:.16}
-.path .n{font-family:"Unbounded","Arial Black",sans-serif;font-size:2.8rem;font-weight:800;color:var(--c);line-height:1;position:relative}
-.path h3{font-size:1rem;margin:12px 0 6px;color:var(--c);padding:0;position:relative}.path p{color:#9A93D1;font-size:.92rem;margin:0;position:relative}
-.path.wb{--c:#4F8CFF}.path.lb{--c:#C45CFF}.path.gf{--c:#FFD166}
 .bento{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:20px}
 .tile{background:#1C1745;border:1px solid #3A3180;border-radius:18px;padding:22px;transition:transform .2s,border-color .2s,box-shadow .2s}
 .tile-link{display:block;color:inherit;text-decoration:none!important;position:relative;cursor:pointer}
@@ -59,7 +52,7 @@ CSS = """<style>
 .live i{width:8px;height:8px;border-radius:50%;background:#FF9F43;animation:ping 1.6s infinite}
 .live.off{color:#9A93D1;border-color:#3A3180;background:#241E5A}.live.off i{background:#9A93D1;animation:none}
 @media (max-width:900px){.hero{grid-template-columns:1fr}.stage{height:390px;max-width:380px;width:100%;margin:0 auto}
-.facts{grid-template-columns:repeat(2,1fr)}.paths{grid-template-columns:1fr}.bento{grid-template-columns:repeat(2,1fr)}}
+.facts{grid-template-columns:repeat(2,1fr)}.bento{grid-template-columns:repeat(2,1fr)}}
 @media (max-width:560px){.bento{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>"""
@@ -135,14 +128,6 @@ def welcome_html(teams, started, bo, slots, event_date, event_place, stream_url)
     words = ["DOUBLE ELIMINATION", "BO1 · BO3 · BO5", "ЖИВА СІТКА", "СТАТИСТИКА МАТЧІВ", "AI-РОЗБІР", "ТРАНСЛЯЦІЯ"]
     run = "<span>◆</span>".join("<b>%s</b>" % w for w in words) + "<span>◆</span>"
     ticker = '<div class="ticker"><div>%s%s</div></div>' % (run, run)
-    steps = (
-        '<div class="sh"><div class="tag">Як це працює</div>'
-        '<h2>Одна поразка <span class="grad">не вирішує все</span></h2>'
-        '<p>Double elimination дає кожній команді друге життя: щоб вибути, програти доведеться двічі.</p></div>'
-        '<div class="paths">'
-        '<div class="path wb"><div class="n">01</div><h3>Верхня сітка</h3><p>Стартують усі. Перемагаєш і прямуєш далі верхньою частиною до фіналу верхньої сітки.</p></div>'
-        '<div class="path lb"><div class="n">02</div><h3>Нижня сітка</h3><p>Програв у верхній? Це ще не кінець. Тут можна пробитися до фіналу, але наступна поразка остання.</p></div>'
-        '<div class="path gf"><div class="n">03</div><h3>Grand Final</h3><p>Переможці верхньої та нижньої сіток зустрічаються в одному вирішальному матчі.</p></div></div>')
     live = ('<span class="live"><i></i>LIVE</span>' if stream_url
             else '<span class="live off"><i></i>СКОРО</span>')
     # Tiles are real links, not decorative cards. Stream remains disabled until STREAM_URL is set.
@@ -161,4 +146,4 @@ def welcome_html(teams, started, bo, slots, event_date, event_place, stream_url)
         '<a class="tile tile-link" href="/games"><h3>📊 Таблиця статистики</h3><p>K/D/A, GPM, шкода та інші показники гравців.</p><span class="tile-cta">Перейти до таблиць ↗</span></a>'
         '<a class="tile tile-link" href="/games"><h3>🤖 Аналіз від ШІ</h3><p>Незвичайні висновки, MVP, поворотні моменти й історія матчу.</p><span class="tile-cta">Читати аналіз ↗</span></a>'
         + stream_tile + '</div>')
-    return banner + hero + ticker + facts_html(teams, started, bo, slots) + steps + bento
+    return banner + hero + ticker + facts_html(teams, started, bo, slots) + bento
