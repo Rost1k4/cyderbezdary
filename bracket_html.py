@@ -44,10 +44,11 @@ details.m[open]>summary .hd{background:#8B6CFF;color:#fff}
 .sec.WB{border-color:#4F8CFF}.sec.WB h3{color:#4F8CFF}
 .sec.LB{border-color:#C45CFF}.sec.LB h3{color:#C45CFF}
 .sec.GF{border-color:#FFD166}.sec.GF h3{color:#FFD166}
+.sec.P3{border-color:#CD9B65}.sec.P3 h3{color:#E3B581}
 </style>"""
 
 STATUS_TEXT = {"waiting": "Очікує", "ready": "Готовий до гри", "done": "Завершено ▾"}
-SECTION_TITLES = {"WB": "Турнірна сітка"}
+SECTION_TITLES = {"WB": "Турнірна сітка", "P3": "🥉 Матч за 3-тє місце"}
 
 
 # ------------------------------------------------------ статистика матчу
@@ -195,7 +196,7 @@ def match_card(slot, stats=None):
         rows.append('<div class="%s"><span>%s</span><b>%s</b></div>'
                     % (css, html.escape(text), score))
     head = ('<div class="hd"><span>%s</span><span>%s</span></div>'
-            % (slot["key"], STATUS_TEXT[slot["status"]]))
+            % (html.escape(T.match_label(slot["key"])), STATUS_TEXT[slot["status"]]))
     body = head + "".join(rows)
     if slot["status"] != "done":
         return '<div class="m %s">%s</div>' % (slot["status"], body)

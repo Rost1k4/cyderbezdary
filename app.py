@@ -234,9 +234,19 @@ def bracket_view():
     champ = T.champion(slots)
     if champ:
         st.success("🏆 Чемпіон турніру: **%s**" % champ)
+    places = T.placements(slots)
+    for team, place in sorted(places.items(), key=lambda item: item[1]):
+        if place in (2, 3):
+            st.success("%s %s: **%s**" % (
+                "🥈" if place == 2 else "🥉", "2-ге місце" if place == 2 else "3-тє місце", team))
+    if champ and not T.is_complete(slots):
+        st.info("Чемпіона визначено. Залишилося зіграти матч за 3-тє місце.")
     st.caption("Формат матчів: BO%d. Бурштинова рамка: матч готовий до гри. М'ятна: завершено, "
                "натисніть на завершений матч, щоб побачити статистику. "
                "Сторінка оновлюється кожні %d с." % (bo, REFRESH_SECONDS))
+    byes = T.bye_count(len(teams))
+    if byes:
+        st.caption("Пропускають початковий раунд (bye): " + ", ".join(teams[:byes]))
     mids = {s["result"]["dota_match_id"] for s in slots.values()
             if s["result"] and s["result"]["dota_match_id"]}
     stats = load_stats(mids, cached_heroes()) if mids else {}
@@ -252,12 +262,18 @@ def table_view():
         st.info("Таблиця з'явиться після початку турніру.")
         return
     rec = T.standings(teams, slots)
+    ordered = sorted(rec.items(), key=lambda item: (
+        item[1]["place"] if item[1]["place"] is not None else len(teams) + 1,
+        -item[1]["W"], item[1]["L"]))
     table = pd.DataFrame([
-        {"Команда": t, "Статус": v["status"], "Перемоги": v["W"], "Поразки": v["L"],
+        {"Місце": str(v["place"]) if v["place"] is not None else "—",
+         "Команда": t, "Статус": v["status"], "Перемоги": v["W"], "Поразки": v["L"],
          "Мапи": "%d:%d" % (v["MW"], v["ML"])}
-        for t, v in rec.items()
-    ]).sort_values(["Перемоги", "Поразки"], ascending=[False, True])
+        for t, v in ordered
+    ])
     st.dataframe(table, hide_index=True)
+    st.caption("Місця 1–2 визначає фінал, місця 3–4 — матч за 3-тє місце. "
+               "Перемоги, поразки та мапи враховують також бронзовий матч.")
 
 
 # ------------------------------------------------------ блок організатора
@@ -267,14 +283,13 @@ def results_admin():
         st.info("Спочатку запустіть турнір у бічній панелі.")
         return
     size = len(teams)
-    champ = T.champion(slots)
     st.subheader("Внести результат")
     selected_key = None
     ready = [s for s in slots.values() if s["status"] == "ready"]
     if not ready:
-        st.info("Турнір завершено." if champ else "Немає матчів, готових до гри.")
+        st.info("Турнір завершено." if T.is_complete(slots) else "Немає матчів, готових до гри.")
     else:
-        options = {"%s: %s vs %s" % (s["key"], s["a"], s["b"]): s["key"] for s in ready}
+        options = {"%s: %s vs %s" % (T.match_label(s["key"]), s["a"], s["b"]): s["key"] for s in ready}
         chosen = st.selectbox("Матч", list(options))
         key = options[chosen]
         selected_key = key
@@ -308,7 +323,7 @@ def results_admin():
         if not ready2:
             st.info("Немає доступних матчів для додавання через скріншот.")
         else:
-            opts = {"%s: %s vs %s" % (s["key"], s["a"], s["b"]): s for s in ready2}
+            opts = {"%s: %s vs %s" % (T.match_label(s["key"]), s["a"], s["b"]): s for s in ready2}
             chosen2 = st.selectbox("Матч для скріншота", list(opts), key="ss_result_match")
             slot = opts[chosen2]
             pasted_images = clipboard_paste.paste_images(key="ss_clipboard_inline") or []
@@ -429,7 +444,7 @@ def results_admin():
         else:
             st.caption("Скасувати можна лише матч, від якого ще не залежить жоден збережений "
                        "результат. Для старішого матчу спочатку скасуйте пізніші.")
-            undo_key = st.selectbox("Матч", editable)
+            undo_key = st.selectbox("Матч", editable, format_func=T.match_label)
             undo_ok = st.checkbox("Підтверджую скасування", key="undo_ok")
             if st.button("Скасувати результат", disabled=not undo_ok):
                 storage.delete_result(undo_key)
@@ -445,7 +460,7 @@ def match_id_admin():
     if not played:
         return
     st.subheader("🔢 Dota Match ID матчу")
-    options = {"%s: %s vs %s" % (s["key"], s["a"], s["b"]): s["key"] for s in played}
+    options = {"%s: %s vs %s" % (T.match_label(s["key"]), s["a"], s["b"]): s["key"] for s in played}
     mk = options[st.selectbox("Матч", list(options), key="mid_match")]
     current = results[mk]["dota_match_id"] or ""
     new = st.text_input("Dota Match ID (не ID лобі). Порожнє поле прибирає ID.", value=current,
@@ -616,7 +631,7 @@ def screenshot_admin():
         return
 
     labels = {
-        "%s: %s vs %s" % (key, slots[key]["a"], slots[key]["b"]): key
+        "%s: %s vs %s" % (T.match_label(key), slots[key]["a"], slots[key]["b"]): key
         for key in played
     }
     chosen_label = st.selectbox(
@@ -665,7 +680,7 @@ def games_page():
         for s in played:
             r = s["result"]
             title = "%s · %s  %d:%d  %s  →  %s" % (
-                s["key"], s["a"], r["score_a"], r["score_b"], s["b"], r["winner"])
+                T.match_label(s["key"]), s["a"], r["score_a"], r["score_b"], s["b"], r["winner"])
             with st.expander(title):
                 mid = r["dota_match_id"]
                 saved_games = shots.get(s["key"], {})
@@ -779,8 +794,9 @@ with st.sidebar:
         teams = storage.get_teams()
         if not storage.is_started():
             st.caption("Додайте %s команд. Порядок додавання = номер у сітці. "
-                       "При 12 і 14 командах перші в списку отримують bye "
-                       "(одразу у другий раунд)." % T.sizes_text())
+                       "Якщо кількість команд не є степенем двійки, перші в списку "
+                       "пропускають початковий раунд. Команди, що програли півфінали, "
+                       "грають за 3-тє місце." % T.sizes_text())
             with st.form("add_team", clear_on_submit=True):
                 new_name = st.text_input("Назва команди")
                 if st.form_submit_button("Додати команду"):
@@ -794,6 +810,9 @@ with st.sidebar:
                     storage.remove_team(name)
                     st.rerun()
             bo_choice = st.selectbox("Формат матчів", T.VALID_BO, format_func=lambda x: "BO%d" % x)
+            if len(teams) in T.VALID_SIZES and T.bye_count(len(teams)):
+                count = T.bye_count(len(teams))
+                st.info("Без гри в початковому раунді (bye): " + ", ".join(teams[:count]))
             if st.button("Запустити турнір", type="primary",
                         disabled=len(teams) not in T.VALID_SIZES):
                 err = storage.start_tournament(bo_choice)

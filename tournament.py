@@ -1,13 +1,14 @@
-"""Логіка Single Elimination (плей-оф) для 4, 8, 12, 14 або 16 команд. Без UI та бази даних.
+"""Single Elimination з матчем за 3-тє місце. Без UI та бази даних.
 
 Сітка описана даними: кожен матч бере команди зі "слотів":
   ("seed", n)   - команда з номером n
   ("win", key)  - переможець матчу key
-Програвший вибуває з турніру. Команда потрапляє в наступний матч ТІЛЬКИ якщо
-результат попереднього збережений (підтверджений). Автоматичного просування немає.
+  ("lose", key) - команда, що програла матч key
+Команда потрапляє в наступний матч лише після підтвердження результату.
+Команди, що програли півфінали, грають за 3-тє місце.
 
-Для 12 і 14 команд перші в списку отримують "bye": 4 команди при 12 і
-2 команди при 14 одразу потрапляють у другий раунд.
+Коли кількість команд не є степенем двійки, перші в списку отримують bye:
+5 → 3, 6 → 2, 7 → 1, 9 → 7, 12 → 4, 14 → 2 команди пропускають перший раунд.
 
 Останній матч сітки - Фінал; його переможець - чемпіон.
 Ключі матчів (W1, W2, ...) збережені як раніше, щоб не втратити вже внесені результати.
@@ -21,6 +22,33 @@ LAYOUTS = {
             ("Фінал", [("W3", ("win", "W1"), ("win", "W2"))]),
         ],
     },
+    5: {
+        "WB": [
+            ("Попередній раунд", [("W1", ("seed", 4), ("seed", 5))]),
+            ("Півфінали", [("W2", ("seed", 1), ("win", "W1")),
+                           ("W3", ("seed", 2), ("seed", 3))]),
+            ("Фінал", [("W4", ("win", "W2"), ("win", "W3"))]),
+        ],
+    },
+    6: {
+        "WB": [
+            ("Попередній раунд", [("W1", ("seed", 3), ("seed", 4)),
+                                  ("W2", ("seed", 5), ("seed", 6))]),
+            ("Півфінали", [("W3", ("seed", 1), ("win", "W1")),
+                           ("W4", ("win", "W2"), ("seed", 2))]),
+            ("Фінал", [("W5", ("win", "W3"), ("win", "W4"))]),
+        ],
+    },
+    7: {
+        "WB": [
+            ("Попередній раунд", [("W1", ("seed", 2), ("seed", 3)),
+                                  ("W2", ("seed", 4), ("seed", 5)),
+                                  ("W3", ("seed", 6), ("seed", 7))]),
+            ("Півфінали", [("W4", ("seed", 1), ("win", "W1")),
+                           ("W5", ("win", "W2"), ("win", "W3"))]),
+            ("Фінал", [("W6", ("win", "W4"), ("win", "W5"))]),
+        ],
+    },
     8: {
         "WB": [
             ("Чвертьфінали", [("W1", ("seed", 1), ("seed", 2)),
@@ -30,6 +58,18 @@ LAYOUTS = {
             ("Півфінали", [("W5", ("win", "W1"), ("win", "W2")),
                            ("W6", ("win", "W3"), ("win", "W4"))]),
             ("Фінал", [("W7", ("win", "W5"), ("win", "W6"))]),
+        ],
+    },
+    9: {
+        "WB": [
+            ("Попередній раунд", [("W1", ("seed", 8), ("seed", 9))]),
+            ("Чвертьфінали", [("W2", ("seed", 1), ("win", "W1")),
+                              ("W3", ("seed", 2), ("seed", 3)),
+                              ("W4", ("seed", 4), ("seed", 5)),
+                              ("W5", ("seed", 6), ("seed", 7))]),
+            ("Півфінали", [("W6", ("win", "W2"), ("win", "W3")),
+                           ("W7", ("win", "W4"), ("win", "W5"))]),
+            ("Фінал", [("W8", ("win", "W6"), ("win", "W7"))]),
         ],
     },
     # 12 команд: команди №1-4 мають bye у "Чвертьфінали"
@@ -87,13 +127,20 @@ LAYOUTS = {
     },
 }
 
-SECTIONS = ("WB",)
+THIRD_PLACE_KEY = "P3"
+for _layout in LAYOUTS.values():
+    _, _semi_a, _semi_b = _layout["WB"][-1][1][0]
+    _layout["P3"] = [("Бронзовий матч", [
+        (THIRD_PLACE_KEY, ("lose", _semi_a[1]), ("lose", _semi_b[1])),
+    ])]
+
+SECTIONS = ("WB", "P3")
 VALID_SIZES = tuple(sorted(LAYOUTS))
 VALID_BO = (1, 3, 5)
 
 
 def sizes_text():
-    """'4, 8, 12, 14 або 16' - для повідомлень користувачу."""
+    """Підтримувані розміри сітки для повідомлень користувачу."""
     return ", ".join(str(n) for n in VALID_SIZES[:-1]) + " або " + str(VALID_SIZES[-1])
 
 
@@ -103,21 +150,34 @@ def flat_matches(size):
     for sec in SECTIONS:
         for _, matches in LAYOUTS[size][sec]:
             out.extend(matches)
-    return out
+    # Матч за бронзу не змінює стару домовленість: останній слот — Фінал.
+    final = final_key(size)
+    return [m for m in out if m[0] != final] + [m for m in out if m[0] == final]
 
 
 def final_key(size):
-    return flat_matches(size)[-1][0]
+    return LAYOUTS[size]["WB"][-1][1][0][0]
 
 
 def section_of(key):
-    return "WB"
+    return "P3" if key == THIRD_PLACE_KEY else "WB"
+
+
+def match_label(key):
+    return "%s · За 3-тє місце" % key if key == THIRD_PLACE_KEY else key
+
+
+def bye_count(size):
+    """Скільки перших команд пропускають початковий раунд."""
+    return (1 << (size - 1).bit_length()) - size
 
 
 def slot_label(src):
     kind, ref = src
     if kind == "seed":
         return "Команда №%d" % ref
+    if kind == "lose":
+        return "Команда, що програла %s" % ref
     return "Переможець %s" % ref
 
 
@@ -134,12 +194,18 @@ def resolve(size, teams, results):
         kind, ref = src
         if kind == "seed":
             return teams[ref - 1] if ref - 1 < len(teams) else None
-        r = results.get(ref)
-        return r["winner"] if r is not None else None
+        previous = slots.get(ref)
+        if not previous or not previous["result"]:
+            return None
+        if kind == "lose":
+            return loser(previous)
+        return previous["result"]["winner"]
 
     for key, a_src, b_src in flat_matches(size):
         a, b = team_from(a_src), team_from(b_src)
         r = results.get(key)
+        if not a or not b or (r and r.get("winner") not in (a, b)):
+            r = None
         status = "done" if r else ("ready" if a and b else "waiting")
         slots[key] = {"key": key, "a": a, "b": b, "result": r, "status": status,
                       "a_label": slot_label(a_src), "b_label": slot_label(b_src)}
@@ -149,6 +215,32 @@ def resolve(size, teams, results):
 def final_slot(slots):
     """Слот Фіналу (останній матч сітки)."""
     return list(slots.values())[-1]
+
+
+def loser(slot):
+    """Команда, що програла за підтвердженим winner, а не за кількістю вбивств."""
+    if not slot or not slot["result"]:
+        return None
+    winner = slot["result"]["winner"]
+    if winner not in (slot["a"], slot["b"]):
+        return None
+    return slot["b"] if winner == slot["a"] else slot["a"]
+
+
+def placements(slots):
+    """Визначені місця 1–4; фінал і бронза можуть бути зіграні в будь-якому порядку."""
+    places = {}
+    if not slots:
+        return places
+    for slot, first in ((final_slot(slots), 1), (slots.get(THIRD_PLACE_KEY), 3)):
+        if slot and slot["result"]:
+            places[slot["result"]["winner"]] = first
+            places[loser(slot)] = first + 1
+    return places
+
+
+def is_complete(slots):
+    return bool(slots) and all(s["status"] == "done" for s in slots.values())
 
 
 def validate_result(bo, score_a, score_b):
@@ -170,7 +262,8 @@ def winner_from_score(team_a, team_b, score_a, score_b):
 def can_edit(size, results, key):
     """Результат можна скасувати, лише якщо від нього ще не залежить жоден підтверджений матч."""
     for k, a_src, b_src in flat_matches(size):
-        if results.get(k) is not None and key in (a_src[1], b_src[1]):
+        if results.get(k) is not None and any(
+                kind in ("win", "lose") and ref == key for kind, ref in (a_src, b_src)):
             return False
     return True
 
@@ -183,17 +276,23 @@ def standings(teams, slots):
         if not r or s["a"] not in rec or s["b"] not in rec:
             continue
         a, b = s["a"], s["b"]
-        loser = b if r["winner"] == a else a
+        lost = loser(s)
         rec[r["winner"]]["W"] += 1
-        rec[loser]["L"] += 1
+        rec[lost]["L"] += 1
         rec[a]["MW"] += r["score_a"]
         rec[a]["ML"] += r["score_b"]
         rec[b]["MW"] += r["score_b"]
         rec[b]["ML"] += r["score_a"]
-    champ = champion(slots)
+    places = placements(slots)
+    place_status = {1: "Чемпіон", 2: "2-ге місце", 3: "3-тє місце", 4: "4-те місце"}
+    bronze = slots.get(THIRD_PLACE_KEY)
+    bronze_teams = {bronze["a"], bronze["b"]} if bronze and not bronze["result"] else set()
     for t, v in rec.items():
-        if champ == t:
-            v["status"] = "Чемпіон"
+        v["place"] = places.get(t)
+        if v["place"] is not None:
+            v["status"] = place_status[v["place"]]
+        elif t in bronze_teams:
+            v["status"] = "Грає за 3-тє місце"
         elif v["L"]:
             v["status"] = "Вибув"
         else:
@@ -202,5 +301,7 @@ def standings(teams, slots):
 
 
 def champion(slots):
+    if not slots:
+        return None
     r = final_slot(slots)["result"]
     return r["winner"] if r else None

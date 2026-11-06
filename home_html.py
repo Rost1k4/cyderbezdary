@@ -101,12 +101,12 @@ def facts_html(teams, started, bo, slots):
     n = len(teams)
     if started:
         played = sum(1 for s in slots.values() if s["result"])
-        status = "Завершено" if T.champion(slots) else "Триває"
+        status = "Завершено" if T.is_complete(slots) else "Триває"
         items = [(n, "команд у турнірі"), ("BO%d" % bo, "формат матчів"),
                  ("%d / %d" % (played, len(slots)), "матчів зіграно"), (status, "статус турніру")]
     else:
         items = [(n or "4–16", "команд зареєстровано" if n else "команд на турнірі"),
-                 ("BO1·3·5", "формат матчів"), ("1 життя", "вибуваєш після поразки"),
+                 ("BO1·3·5", "формат матчів"), ("Плей-оф", "з матчем за 3-тє місце"),
                  ("Реєстрація" if n else "Скоро", "статус турніру")]
     return '<div class="facts">%s</div>' % "".join(
         '<div class="fact"><b>%s</b><span>%s</span></div>' % (_e(v), _e(l)) for v, l in items)
@@ -121,7 +121,8 @@ def welcome_html(teams, started, bo, slots, event_date, event_place, stream_url)
         '<h1 class="hh">Турнір з <em>Dota&nbsp;2</em></h1>'
         '<p>Вітаємо на турнірі з Dota 2! Слідкуйте за сіткою, результатами та детальним аналізом '
         'кожної гри в реальному часі.</p>'
-        '<div class="chips"><span class="chip b">Плей-оф</span><span class="chip g">Фінал</span></div>'
+        '<div class="chips"><span class="chip b">Плей-оф</span><span class="chip g">Фінал</span>'
+        '<span class="chip p">Матч за 3-тє місце</span></div>'
         '<div class="meta"><span>📅 %s</span><span>📍 %s</span></div></div>%s</div>'
         % (_e(event_date), _e(event_place), stage_html(started, slots)))
     words = ["SINGLE ELIMINATION", "BO1 · BO3 · BO5", "ЖИВА СІТКА", "СТАТИСТИКА МАТЧІВ", "AI-РОЗБІР", "ТРАНСЛЯЦІЯ"]
